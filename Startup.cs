@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using ReadMeter.Api.Businesses;
 using ReadMeter.Api.Configuration;
 using ReadMeter.Api.Data;
@@ -24,7 +25,20 @@ public class Startup
         services.AddControllers().AddJsonOptions(ConfigureJson);
         services.AddHealthChecks();
         services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen();
+        services.AddSwaggerGen(options =>
+        {
+            options.SwaggerDoc("v1", new OpenApiInfo
+            {
+                Title = "API App Chỉ Số Nước",
+                Version = "v1",
+                Description = "Created by pthanhdng@gmail.com\n\nPhone: 0905006999",
+                Contact = new OpenApiContact
+                {
+                    Name = "pthanhdng@gmail.com",
+                    Email = "pthanhdng@gmail.com"
+                }
+            });
+        });
         RegisterOracleContexts(services);
         RegisterDependencies(services);
     }
