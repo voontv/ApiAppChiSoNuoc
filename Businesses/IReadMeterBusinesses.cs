@@ -1,0 +1,62 @@
+using Microsoft.AspNetCore.Mvc;
+using ReadMeter.Api.Contracts.Requests;
+
+namespace ReadMeter.Api.Businesses;
+
+public interface IReadMeterBusinesses
+{
+    Task<ContentResult> P_00_KET_NOI_DB_CHECK(string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_01_DANG_NHAP(string? USER, string? PASSWORD, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_011_DANG_NHAP_DOI_MAT_KHAU(string? MA_BIEN_DOC, string? PASSWORD_OLD, string? PASSWORD_NEW1, string? PASSWORD_NEW2, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_012_LAY_GT_CANH_BAO(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_013_LAY_PHIEN_BAN_APP(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_01_DANG_NHAP_LUU_TOKEN(string? TOKEN, string? VER_CODE, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_021_LAY_DS_SO_DOC(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_0211_LAY_DS_SO_DOC_BS(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_0212_LAY_DS_SO_DOC_TRA_CUU(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_022_NHAN_SO_DOC(string? DANH_SACH_MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_03_LAY_DS_KHACH_HANG(string? ID_DOC_opt, string? STT_SO_DOC_opt, string? MA_KH_opt, string? TEN_KH_opt, string? DIA_CHI_DH_opt, string? PHONE_KH_opt, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? KIEU_LOC, string? SAP_XEP_THEO, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_03_LAY_DS_KHACH_HANG_SUB(string? ID_DOC_opt, string? STT_SO_DOC_opt, string? MA_KH_opt, string? TEN_KH_opt, string? DIA_CHI_DH_opt, string? PHONE_KH_opt, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? KIEU_LOC, string? SAP_XEP_THEO, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_03_LAY_DS_KHACH_HANG_SUB_BS(string? ID_DOC_opt, string? STT_SO_DOC_opt, string? MA_KH_opt, string? TEN_KH_opt, string? DIA_CHI_DH_opt, string? PHONE_KH_opt, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? KIEU_LOC, string? SAP_XEP_THEO, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_0313_LAY_DS_KHACH_HANG_TRA_CUU(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_043_LO_TRINH_DI_DOC_MAP(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_044_LUU_TEN_FILE_ANH(string? ID_DONG_HO, string? TEN_FILE_ANH, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_032_LAY_SL_BINH_QUAN_3T(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_041_NHAP_XUAT_CS_LE_ONLINE(string? ID_DONG_HO, string? MA_TINH_TRANG_DH, string? QUA_VONG, string? LOAI_CHI_SO, string? NGAY_DOC_CS, string? CHI_SO_MOI, string? SAN_LUONG_TT, string? TONG_SL, string? CONG_CHI_SO, string? SAN_LUONG_DUNG_IT, string? MA_GHI_CHU, string? GHI_CHU, string? VI_TRI_DOC, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_045_CANH_BAO_SAN_LUONG_LON(string? ID_DONG_HO, string? MA_KHACH_HANG, string? MA_BIEN_DOC, long TONG_SL, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_045_LUU_XEP_SO_DOC(string? ID_DONG_HO, string? MA_KHACH_HANG, string? STT_CU, string? STT_MOI, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_041_NHAP_XUAT_CS_LE_ONLINE_SUB(string? ID_DONG_HO, string? MA_TINH_TRANG_DH, string? QUA_VONG, string? LOAI_CHI_SO, string? NGAY_DOC_CS, string? CHI_SO_MOI, string? SAN_LUONG_TT, string? TONG_SL, string? CONG_CHI_SO, string? SAN_LUONG_DUNG_IT, string? MA_GHI_CHU, string? GHI_CHU, string? VI_TRI_DOC, string? MA_KHACH_HANG, string? MA_SO_DOC, string? THANG, string? MA_XI_NGHIEP, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_051_KIEM_TRA_BAN_GIAO_SD(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_05_BD_BAN_GIAO_CS_XONG(string? DANH_SACH_MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_81_LAY_TT_KHACH_HANG(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_82_LAY_TT_HOA_DON(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_83_LAY_TT_CHI_SO(string? SO_HOA_DON, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_84_LAY_TT_GIA_NUOC(string? SO_HOA_DON, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_85_LAY_TT_GUI_SMS(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_88_LAY_TT_CAT_MO_NUOC(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_86_LAY_TT_GUI_EMAIL(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_96_CC_DM_YEU_CAU(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_97_CC_DM_QUAN(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_98_CC_DM_PHUONG(string? MA_BIEN_DOC, string? MA_QUAN, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_91_DM_XI_NGHIEP(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_92_DM_BIEN_DOC(string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_921_DM_SO_DOC(string? opt_MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_99_DM_GHI_CHU(string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_931_DM_DIEM_THU_HO(string? MA_DIEM_THU, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_93_DM_TINH_TRANG_DH(string? MA_TINH_TRANG_DH, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_94_DM_LOAI_CHI_SO(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_95_DM_QUA_VONG(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> PF_01_GetSysDateString(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> PF_01_GetSysDate_Thang(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> PF_02_LAY_CHI_SO_THAO_LAP(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_89_TINH_TIEN(string? MA_GIA, string? SAN_LUONG_SD, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_011_CHECKIN_DS_KH_CAT_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_012_CHECKIN_DS_KH_MO_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_013_CHECKIN_DS_KH_GUI_GB(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_99_CHECKIN_DM_KIEU_CAT(string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_02_CHECKIN_LUU_KH_CAT_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? NGUOI_THI_CONG, string? MA_KIEU_CAT_MO, string? NGAY_HOAN_THANH, string? VI_TRI_XAC_NHAN, string? MA_GHI_CHU, string? GHI_CHU, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_03_CHECKIN_LUU_KH_MO_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? NGUOI_THI_CONG, string? MA_KIEU_CAT_MO, string? NGAY_HOAN_THANH, string? VI_TRI_XAC_NHAN, string? MA_GHI_CHU, string? GHI_CHU, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_00_CHECKIN_LUU_TEN_FILE_ANH(string? ID_XAC_NHAN, string? LOAI_CV, string? TEN_FILE_ANH, string? MA_NHAN_VIEN, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_07_CC_BAO_SU_CO(P_07_CC_BAO_SU_CORequest request, CancellationToken cancellationToken);
+    Task<ContentResult> P_9E_SUA_THONG_TIN_KH(P_9E_SUA_THONG_TIN_KHRequest request, CancellationToken cancellationToken);
+}

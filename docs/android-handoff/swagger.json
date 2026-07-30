@@ -1,0 +1,3311 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "SwaggerExport",
+    "version": "1.0"
+  },
+  "paths": {
+    "/api/CheckIn/A_011_CHECKIN_DS_KH_CAT_NUOC": {
+      "post": {
+        "tags": [
+          "CheckIn"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_011_CHECKIN_DS_KH_CAT_NUOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_011_CHECKIN_DS_KH_CAT_NUOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_011_CHECKIN_DS_KH_CAT_NUOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/CheckIn/A_012_CHECKIN_DS_KH_MO_NUOC": {
+      "post": {
+        "tags": [
+          "CheckIn"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_012_CHECKIN_DS_KH_MO_NUOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_012_CHECKIN_DS_KH_MO_NUOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_012_CHECKIN_DS_KH_MO_NUOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/CheckIn/A_013_CHECKIN_DS_KH_GUI_GB": {
+      "post": {
+        "tags": [
+          "CheckIn"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_013_CHECKIN_DS_KH_GUI_GBRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_013_CHECKIN_DS_KH_GUI_GBRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_013_CHECKIN_DS_KH_GUI_GBRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/CheckIn/A_99_CHECKIN_DM_KIEU_CAT": {
+      "post": {
+        "tags": [
+          "CheckIn"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_99_CHECKIN_DM_KIEU_CATRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_99_CHECKIN_DM_KIEU_CATRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_99_CHECKIN_DM_KIEU_CATRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/CheckIn/A_02_CHECKIN_LUU_KH_CAT_NUOC": {
+      "post": {
+        "tags": [
+          "CheckIn"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_02_CHECKIN_LUU_KH_CAT_NUOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_02_CHECKIN_LUU_KH_CAT_NUOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_02_CHECKIN_LUU_KH_CAT_NUOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/CheckIn/A_03_CHECKIN_LUU_KH_MO_NUOC": {
+      "post": {
+        "tags": [
+          "CheckIn"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_03_CHECKIN_LUU_KH_MO_NUOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_03_CHECKIN_LUU_KH_MO_NUOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_03_CHECKIN_LUU_KH_MO_NUOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/CheckIn/A_00_CHECKIN_LUU_TEN_FILE_ANH": {
+      "post": {
+        "tags": [
+          "CheckIn"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_00_CHECKIN_LUU_TEN_FILE_ANHRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_00_CHECKIN_LUU_TEN_FILE_ANHRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/A_00_CHECKIN_LUU_TEN_FILE_ANHRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_00_KET_NOI_DB_CHECK": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_00_KET_NOI_DB_CHECKRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_00_KET_NOI_DB_CHECKRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_00_KET_NOI_DB_CHECKRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_01_DANG_NHAP": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_01_DANG_NHAPRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_01_DANG_NHAPRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_01_DANG_NHAPRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_011_DANG_NHAP_DOI_MAT_KHAU": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_011_DANG_NHAP_DOI_MAT_KHAURequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_011_DANG_NHAP_DOI_MAT_KHAURequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_011_DANG_NHAP_DOI_MAT_KHAURequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_012_LAY_GT_CANH_BAO": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_012_LAY_GT_CANH_BAORequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_012_LAY_GT_CANH_BAORequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_012_LAY_GT_CANH_BAORequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_013_LAY_PHIEN_BAN_APP": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_013_LAY_PHIEN_BAN_APPRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_013_LAY_PHIEN_BAN_APPRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_013_LAY_PHIEN_BAN_APPRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_01_DANG_NHAP_LUU_TOKEN": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_01_DANG_NHAP_LUU_TOKENRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_01_DANG_NHAP_LUU_TOKENRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_01_DANG_NHAP_LUU_TOKENRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_021_LAY_DS_SO_DOC": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_021_LAY_DS_SO_DOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_021_LAY_DS_SO_DOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_021_LAY_DS_SO_DOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_0211_LAY_DS_SO_DOC_BS": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_0211_LAY_DS_SO_DOC_BSRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_0211_LAY_DS_SO_DOC_BSRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_0211_LAY_DS_SO_DOC_BSRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_0212_LAY_DS_SO_DOC_TRA_CUU": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_0212_LAY_DS_SO_DOC_TRA_CUURequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_0212_LAY_DS_SO_DOC_TRA_CUURequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_0212_LAY_DS_SO_DOC_TRA_CUURequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_022_NHAN_SO_DOC": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_022_NHAN_SO_DOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_022_NHAN_SO_DOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_022_NHAN_SO_DOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_03_LAY_DS_KHACH_HANG": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_03_LAY_DS_KHACH_HANGRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_03_LAY_DS_KHACH_HANGRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_03_LAY_DS_KHACH_HANGRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_03_LAY_DS_KHACH_HANG_SUB": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_03_LAY_DS_KHACH_HANG_SUBRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_03_LAY_DS_KHACH_HANG_SUBRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_03_LAY_DS_KHACH_HANG_SUBRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_03_LAY_DS_KHACH_HANG_SUB_BS": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_03_LAY_DS_KHACH_HANG_SUB_BSRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_03_LAY_DS_KHACH_HANG_SUB_BSRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_03_LAY_DS_KHACH_HANG_SUB_BSRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_0313_LAY_DS_KHACH_HANG_TRA_CUU": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_0313_LAY_DS_KHACH_HANG_TRA_CUURequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_0313_LAY_DS_KHACH_HANG_TRA_CUURequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_0313_LAY_DS_KHACH_HANG_TRA_CUURequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_043_LO_TRINH_DI_DOC_MAP": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_043_LO_TRINH_DI_DOC_MAPRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_043_LO_TRINH_DI_DOC_MAPRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_043_LO_TRINH_DI_DOC_MAPRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_044_LUU_TEN_FILE_ANH": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_044_LUU_TEN_FILE_ANHRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_044_LUU_TEN_FILE_ANHRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_044_LUU_TEN_FILE_ANHRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_032_LAY_SL_BINH_QUAN_3T": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_032_LAY_SL_BINH_QUAN_3TRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_032_LAY_SL_BINH_QUAN_3TRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_032_LAY_SL_BINH_QUAN_3TRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_041_NHAP_XUAT_CS_LE_ONLINE": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_041_NHAP_XUAT_CS_LE_ONLINERequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_041_NHAP_XUAT_CS_LE_ONLINERequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_041_NHAP_XUAT_CS_LE_ONLINERequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_045_CANH_BAO_SAN_LUONG_LON": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_045_CANH_BAO_SAN_LUONG_LONRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_045_CANH_BAO_SAN_LUONG_LONRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_045_CANH_BAO_SAN_LUONG_LONRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_045_LUU_XEP_SO_DOC": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_045_LUU_XEP_SO_DOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_045_LUU_XEP_SO_DOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_045_LUU_XEP_SO_DOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_041_NHAP_XUAT_CS_LE_ONLINE_SUB": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_041_NHAP_XUAT_CS_LE_ONLINE_SUBRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_041_NHAP_XUAT_CS_LE_ONLINE_SUBRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_041_NHAP_XUAT_CS_LE_ONLINE_SUBRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_051_KIEM_TRA_BAN_GIAO_SD": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_051_KIEM_TRA_BAN_GIAO_SDRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_051_KIEM_TRA_BAN_GIAO_SDRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_051_KIEM_TRA_BAN_GIAO_SDRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_05_BD_BAN_GIAO_CS_XONG": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_05_BD_BAN_GIAO_CS_XONGRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_05_BD_BAN_GIAO_CS_XONGRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_05_BD_BAN_GIAO_CS_XONGRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_81_LAY_TT_KHACH_HANG": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_81_LAY_TT_KHACH_HANGRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_81_LAY_TT_KHACH_HANGRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_81_LAY_TT_KHACH_HANGRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_82_LAY_TT_HOA_DON": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_82_LAY_TT_HOA_DONRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_82_LAY_TT_HOA_DONRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_82_LAY_TT_HOA_DONRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_83_LAY_TT_CHI_SO": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_83_LAY_TT_CHI_SORequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_83_LAY_TT_CHI_SORequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_83_LAY_TT_CHI_SORequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_84_LAY_TT_GIA_NUOC": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_84_LAY_TT_GIA_NUOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_84_LAY_TT_GIA_NUOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_84_LAY_TT_GIA_NUOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_85_LAY_TT_GUI_SMS": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_85_LAY_TT_GUI_SMSRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_85_LAY_TT_GUI_SMSRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_85_LAY_TT_GUI_SMSRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_88_LAY_TT_CAT_MO_NUOC": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_88_LAY_TT_CAT_MO_NUOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_88_LAY_TT_CAT_MO_NUOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_88_LAY_TT_CAT_MO_NUOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_86_LAY_TT_GUI_EMAIL": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_86_LAY_TT_GUI_EMAILRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_86_LAY_TT_GUI_EMAILRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_86_LAY_TT_GUI_EMAILRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_96_CC_DM_YEU_CAU": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_96_CC_DM_YEU_CAURequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_96_CC_DM_YEU_CAURequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_96_CC_DM_YEU_CAURequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_97_CC_DM_QUAN": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_97_CC_DM_QUANRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_97_CC_DM_QUANRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_97_CC_DM_QUANRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_98_CC_DM_PHUONG": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_98_CC_DM_PHUONGRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_98_CC_DM_PHUONGRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_98_CC_DM_PHUONGRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_91_DM_XI_NGHIEP": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_91_DM_XI_NGHIEPRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_91_DM_XI_NGHIEPRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_91_DM_XI_NGHIEPRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_92_DM_BIEN_DOC": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_92_DM_BIEN_DOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_92_DM_BIEN_DOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_92_DM_BIEN_DOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_921_DM_SO_DOC": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_921_DM_SO_DOCRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_921_DM_SO_DOCRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_921_DM_SO_DOCRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_99_DM_GHI_CHU": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_99_DM_GHI_CHURequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_99_DM_GHI_CHURequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_99_DM_GHI_CHURequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_931_DM_DIEM_THU_HO": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_931_DM_DIEM_THU_HORequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_931_DM_DIEM_THU_HORequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_931_DM_DIEM_THU_HORequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_93_DM_TINH_TRANG_DH": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_93_DM_TINH_TRANG_DHRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_93_DM_TINH_TRANG_DHRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_93_DM_TINH_TRANG_DHRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_94_DM_LOAI_CHI_SO": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_94_DM_LOAI_CHI_SORequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_94_DM_LOAI_CHI_SORequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_94_DM_LOAI_CHI_SORequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_95_DM_QUA_VONG": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_95_DM_QUA_VONGRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_95_DM_QUA_VONGRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_95_DM_QUA_VONGRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_89_TINH_TIEN": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_89_TINH_TIENRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_89_TINH_TIENRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_89_TINH_TIENRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_07_CC_BAO_SU_CO": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_07_CC_BAO_SU_CORequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_07_CC_BAO_SU_CORequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_07_CC_BAO_SU_CORequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/DocChiSo/P_9E_SUA_THONG_TIN_KH": {
+      "post": {
+        "tags": [
+          "DocChiSo"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_9E_SUA_THONG_TIN_KHRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_9E_SUA_THONG_TIN_KHRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/P_9E_SUA_THONG_TIN_KHRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/TienIch/PF_01_GetSysDateString": {
+      "post": {
+        "tags": [
+          "TienIch"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PF_01_GetSysDateStringRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PF_01_GetSysDateStringRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PF_01_GetSysDateStringRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/TienIch/PF_01_GetSysDate_Thang": {
+      "post": {
+        "tags": [
+          "TienIch"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PF_01_GetSysDate_ThangRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PF_01_GetSysDate_ThangRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PF_01_GetSysDate_ThangRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/TienIch/PF_02_LAY_CHI_SO_THAO_LAP": {
+      "post": {
+        "tags": [
+          "TienIch"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PF_02_LAY_CHI_SO_THAO_LAPRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PF_02_LAY_CHI_SO_THAO_LAPRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PF_02_LAY_CHI_SO_THAO_LAPRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "A_00_CHECKIN_LUU_TEN_FILE_ANHRequest": {
+        "type": "object",
+        "properties": {
+          "ID_XAC_NHAN": {
+            "type": "string",
+            "nullable": true
+          },
+          "LOAI_CV": {
+            "type": "string",
+            "nullable": true
+          },
+          "TEN_FILE_ANH": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_NHAN_VIEN": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "A_011_CHECKIN_DS_KH_CAT_NUOCRequest": {
+        "type": "object",
+        "properties": {
+          "MA_NHAN_VIEN": {
+            "type": "string",
+            "nullable": true
+          },
+          "TU_NGAY": {
+            "type": "string",
+            "nullable": true
+          },
+          "DEN_NGAY": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "A_012_CHECKIN_DS_KH_MO_NUOCRequest": {
+        "type": "object",
+        "properties": {
+          "MA_NHAN_VIEN": {
+            "type": "string",
+            "nullable": true
+          },
+          "TU_NGAY": {
+            "type": "string",
+            "nullable": true
+          },
+          "DEN_NGAY": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "A_013_CHECKIN_DS_KH_GUI_GBRequest": {
+        "type": "object",
+        "properties": {
+          "MA_NHAN_VIEN": {
+            "type": "string",
+            "nullable": true
+          },
+          "TU_NGAY": {
+            "type": "string",
+            "nullable": true
+          },
+          "DEN_NGAY": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "A_02_CHECKIN_LUU_KH_CAT_NUOCRequest": {
+        "type": "object",
+        "properties": {
+          "ID_XAC_NHAN": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_NHAN_VIEN": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "NGUOI_THI_CONG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_KIEU_CAT_MO": {
+            "type": "string",
+            "nullable": true
+          },
+          "NGAY_HOAN_THANH": {
+            "type": "string",
+            "nullable": true
+          },
+          "VI_TRI_XAC_NHAN": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_GHI_CHU": {
+            "type": "string",
+            "nullable": true
+          },
+          "GHI_CHU": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "A_03_CHECKIN_LUU_KH_MO_NUOCRequest": {
+        "type": "object",
+        "properties": {
+          "ID_XAC_NHAN": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_NHAN_VIEN": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "NGUOI_THI_CONG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_KIEU_CAT_MO": {
+            "type": "string",
+            "nullable": true
+          },
+          "NGAY_HOAN_THANH": {
+            "type": "string",
+            "nullable": true
+          },
+          "VI_TRI_XAC_NHAN": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_GHI_CHU": {
+            "type": "string",
+            "nullable": true
+          },
+          "GHI_CHU": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "A_99_CHECKIN_DM_KIEU_CATRequest": {
+        "type": "object",
+        "properties": {
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PF_01_GetSysDateStringRequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PF_01_GetSysDate_ThangRequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PF_02_LAY_CHI_SO_THAO_LAPRequest": {
+        "type": "object",
+        "properties": {
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_00_KET_NOI_DB_CHECKRequest": {
+        "type": "object",
+        "properties": {
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_011_DANG_NHAP_DOI_MAT_KHAURequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_OLD": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_NEW1": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_NEW2": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_012_LAY_GT_CANH_BAORequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_013_LAY_PHIEN_BAN_APPRequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_01_DANG_NHAPRequest": {
+        "type": "object",
+        "properties": {
+          "USER": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_01_DANG_NHAP_LUU_TOKENRequest": {
+        "type": "object",
+        "properties": {
+          "TOKEN": {
+            "type": "string",
+            "nullable": true
+          },
+          "VER_CODE": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_0211_LAY_DS_SO_DOC_BSRequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_0212_LAY_DS_SO_DOC_TRA_CUURequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_021_LAY_DS_SO_DOCRequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_022_NHAN_SO_DOCRequest": {
+        "type": "object",
+        "properties": {
+          "DANH_SACH_MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_0313_LAY_DS_KHACH_HANG_TRA_CUURequest": {
+        "type": "object",
+        "properties": {
+          "MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_032_LAY_SL_BINH_QUAN_3TRequest": {
+        "type": "object",
+        "properties": {
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_03_LAY_DS_KHACH_HANGRequest": {
+        "type": "object",
+        "properties": {
+          "ID_DOC_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "STT_SO_DOC_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_KH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "TEN_KH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "DIA_CHI_DH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "PHONE_KH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "KIEU_LOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SAP_XEP_THEO": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_03_LAY_DS_KHACH_HANG_SUBRequest": {
+        "type": "object",
+        "properties": {
+          "ID_DOC_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "STT_SO_DOC_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_KH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "TEN_KH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "DIA_CHI_DH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "PHONE_KH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "KIEU_LOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SAP_XEP_THEO": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_03_LAY_DS_KHACH_HANG_SUB_BSRequest": {
+        "type": "object",
+        "properties": {
+          "ID_DOC_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "STT_SO_DOC_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_KH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "TEN_KH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "DIA_CHI_DH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "PHONE_KH_opt": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "KIEU_LOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SAP_XEP_THEO": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_041_NHAP_XUAT_CS_LE_ONLINERequest": {
+        "type": "object",
+        "properties": {
+          "ID_DONG_HO": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_TINH_TRANG_DH": {
+            "type": "string",
+            "nullable": true
+          },
+          "QUA_VONG": {
+            "type": "string",
+            "nullable": true
+          },
+          "LOAI_CHI_SO": {
+            "type": "string",
+            "nullable": true
+          },
+          "NGAY_DOC_CS": {
+            "type": "string",
+            "nullable": true
+          },
+          "CHI_SO_MOI": {
+            "type": "string",
+            "nullable": true
+          },
+          "SAN_LUONG_TT": {
+            "type": "string",
+            "nullable": true
+          },
+          "TONG_SL": {
+            "type": "string",
+            "nullable": true
+          },
+          "CONG_CHI_SO": {
+            "type": "string",
+            "nullable": true
+          },
+          "SAN_LUONG_DUNG_IT": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_GHI_CHU": {
+            "type": "string",
+            "nullable": true
+          },
+          "GHI_CHU": {
+            "type": "string",
+            "nullable": true
+          },
+          "VI_TRI_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_041_NHAP_XUAT_CS_LE_ONLINE_SUBRequest": {
+        "type": "object",
+        "properties": {
+          "ID_DONG_HO": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_TINH_TRANG_DH": {
+            "type": "string",
+            "nullable": true
+          },
+          "QUA_VONG": {
+            "type": "string",
+            "nullable": true
+          },
+          "LOAI_CHI_SO": {
+            "type": "string",
+            "nullable": true
+          },
+          "NGAY_DOC_CS": {
+            "type": "string",
+            "nullable": true
+          },
+          "CHI_SO_MOI": {
+            "type": "string",
+            "nullable": true
+          },
+          "SAN_LUONG_TT": {
+            "type": "string",
+            "nullable": true
+          },
+          "TONG_SL": {
+            "type": "string",
+            "nullable": true
+          },
+          "CONG_CHI_SO": {
+            "type": "string",
+            "nullable": true
+          },
+          "SAN_LUONG_DUNG_IT": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_GHI_CHU": {
+            "type": "string",
+            "nullable": true
+          },
+          "GHI_CHU": {
+            "type": "string",
+            "nullable": true
+          },
+          "VI_TRI_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_043_LO_TRINH_DI_DOC_MAPRequest": {
+        "type": "object",
+        "properties": {
+          "MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_044_LUU_TEN_FILE_ANHRequest": {
+        "type": "object",
+        "properties": {
+          "ID_DONG_HO": {
+            "type": "string",
+            "nullable": true
+          },
+          "TEN_FILE_ANH": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_045_CANH_BAO_SAN_LUONG_LONRequest": {
+        "type": "object",
+        "properties": {
+          "ID_DONG_HO": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "TONG_SL": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_045_LUU_XEP_SO_DOCRequest": {
+        "type": "object",
+        "properties": {
+          "ID_DONG_HO": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "STT_CU": {
+            "type": "string",
+            "nullable": true
+          },
+          "STT_MOI": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_051_KIEM_TRA_BAN_GIAO_SDRequest": {
+        "type": "object",
+        "properties": {
+          "MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_05_BD_BAN_GIAO_CS_XONGRequest": {
+        "type": "object",
+        "properties": {
+          "DANH_SACH_MA_SO_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_07_CC_BAO_SU_CORequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "loai_yeu_cau": {
+            "type": "string",
+            "nullable": true
+          },
+          "opt_MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "ma_quan": {
+            "type": "string",
+            "nullable": true
+          },
+          "ma_phuong": {
+            "type": "string",
+            "nullable": true
+          },
+          "ten_khach_hang": {
+            "type": "string",
+            "nullable": true
+          },
+          "dia_chi_khach_hang": {
+            "type": "string",
+            "nullable": true
+          },
+          "so_dien_thoai_KH": {
+            "type": "string",
+            "nullable": true
+          },
+          "opt_email_kh": {
+            "type": "string",
+            "nullable": true
+          },
+          "noi_dung_yeu_cau": {
+            "type": "string",
+            "nullable": true
+          },
+          "khach_hang_yeu_cau": {
+            "type": "string",
+            "nullable": true
+          },
+          "xu_ly_24h": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_81_LAY_TT_KHACH_HANGRequest": {
+        "type": "object",
+        "properties": {
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_82_LAY_TT_HOA_DONRequest": {
+        "type": "object",
+        "properties": {
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_83_LAY_TT_CHI_SORequest": {
+        "type": "object",
+        "properties": {
+          "SO_HOA_DON": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_84_LAY_TT_GIA_NUOCRequest": {
+        "type": "object",
+        "properties": {
+          "SO_HOA_DON": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_85_LAY_TT_GUI_SMSRequest": {
+        "type": "object",
+        "properties": {
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_86_LAY_TT_GUI_EMAILRequest": {
+        "type": "object",
+        "properties": {
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_88_LAY_TT_CAT_MO_NUOCRequest": {
+        "type": "object",
+        "properties": {
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_89_TINH_TIENRequest": {
+        "type": "object",
+        "properties": {
+          "MA_GIA": {
+            "type": "string",
+            "nullable": true
+          },
+          "SAN_LUONG_SD": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_91_DM_XI_NGHIEPRequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_921_DM_SO_DOCRequest": {
+        "type": "object",
+        "properties": {
+          "opt_MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_92_DM_BIEN_DOCRequest": {
+        "type": "object",
+        "properties": {
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_931_DM_DIEM_THU_HORequest": {
+        "type": "object",
+        "properties": {
+          "MA_DIEM_THU": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_93_DM_TINH_TRANG_DHRequest": {
+        "type": "object",
+        "properties": {
+          "MA_TINH_TRANG_DH": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_94_DM_LOAI_CHI_SORequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_95_DM_QUA_VONGRequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_96_CC_DM_YEU_CAURequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_97_CC_DM_QUANRequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_98_CC_DM_PHUONGRequest": {
+        "type": "object",
+        "properties": {
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_QUAN": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_99_DM_GHI_CHURequest": {
+        "type": "object",
+        "properties": {
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "P_9E_SUA_THONG_TIN_KHRequest": {
+        "type": "object",
+        "properties": {
+          "MA_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_XI_NGHIEP": {
+            "type": "string",
+            "nullable": true
+          },
+          "MA_BIEN_DOC": {
+            "type": "string",
+            "nullable": true
+          },
+          "THANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "opt_TEN_KHACH_HANG": {
+            "type": "string",
+            "nullable": true
+          },
+          "opt_DIA_CHI_DONG_HO": {
+            "type": "string",
+            "nullable": true
+          },
+          "opt_SO_DT": {
+            "type": "string",
+            "nullable": true
+          },
+          "opt_EMAIL": {
+            "type": "string",
+            "nullable": true
+          },
+          "opt_DONG_HO_TEN": {
+            "type": "string",
+            "nullable": true
+          },
+          "opt_DONG_HO_SERIAL": {
+            "type": "string",
+            "nullable": true
+          },
+          "opt_GHI_CHU": {
+            "type": "string",
+            "nullable": true
+          },
+          "SO_IMEI": {
+            "type": "string",
+            "nullable": true
+          },
+          "PASSWORD_K": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
