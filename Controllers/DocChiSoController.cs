@@ -20,6 +20,10 @@ public sealed class DocChiSoController : ControllerBase
     public Task<ContentResult> P_01_DANG_NHAP([FromBody] P_01_DANG_NHAPRequest request, CancellationToken cancellationToken) =>
         _businesses.P_01_DANG_NHAP(request.USER, request.PASSWORD, request.SO_IMEI, request.PASSWORD_K, cancellationToken);
 
+    [HttpPost("DANGNHAPTHEOMANLD")]
+    public Task<ContentResult> DANGNHAPTHEOMANLD([FromBody] DANGNHAPTHEOMANLDRequest request, CancellationToken cancellationToken) =>
+        _businesses.DANGNHAPTHEOMANLD(request.MA_KHACH_HANG, request.PASS, request.SO_DIEN_THOAI, cancellationToken);
+
     [HttpPost("P_011_DANG_NHAP_DOI_MAT_KHAU")]
     public Task<ContentResult> P_011_DANG_NHAP_DOI_MAT_KHAU([FromBody] P_011_DANG_NHAP_DOI_MAT_KHAURequest request, CancellationToken cancellationToken) =>
         _businesses.P_011_DANG_NHAP_DOI_MAT_KHAU(request.MA_BIEN_DOC, request.PASSWORD_OLD, request.PASSWORD_NEW1, request.PASSWORD_NEW2, request.SO_IMEI, request.PASSWORD_K, cancellationToken);

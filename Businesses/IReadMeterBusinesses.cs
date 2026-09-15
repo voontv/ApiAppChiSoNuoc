@@ -7,6 +7,7 @@ public interface IReadMeterBusinesses
 {
     Task<ContentResult> P_00_KET_NOI_DB_CHECK(string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> P_01_DANG_NHAP(string? USER, string? PASSWORD, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> DANGNHAPTHEOMANLD(string? MA_KHACH_HANG, string? PASS, string? SO_DIEN_THOAI, CancellationToken cancellationToken);
     Task<ContentResult> P_011_DANG_NHAP_DOI_MAT_KHAU(string? MA_BIEN_DOC, string? PASSWORD_OLD, string? PASSWORD_NEW1, string? PASSWORD_NEW2, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> P_012_LAY_GT_CANH_BAO(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> P_013_LAY_PHIEN_BAN_APP(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
@@ -49,7 +50,7 @@ public interface IReadMeterBusinesses
     Task<ContentResult> PF_01_GetSysDateString(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> PF_01_GetSysDate_Thang(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> PF_02_LAY_CHI_SO_THAO_LAP(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
-    Task<ContentResult> P_89_TINH_TIEN(string? MA_GIA, string? SAN_LUONG_SD, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> P_89_TINH_TIEN(string MA_GIA,string SAN_LUONG_SD,string MA_BIEN_DOC,string SO_IMEI, string PASSWORD_K,CancellationToken cancellationToken);
     Task<ContentResult> A_011_CHECKIN_DS_KH_CAT_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> A_012_CHECKIN_DS_KH_MO_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> A_013_CHECKIN_DS_KH_GUI_GB(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);

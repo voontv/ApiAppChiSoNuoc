@@ -39,6 +39,7 @@ public class Startup
                 }
             });
         });
+        services.AddHttpClient();
         RegisterOracleContexts(services);
         RegisterDependencies(services);
     }

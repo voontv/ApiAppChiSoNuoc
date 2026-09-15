@@ -1,22 +1,30 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Oracle.ManagedDataAccess.Client;
 using ReadMeter.Api.Data;
 using ReadMeter.Api.Models;
 using ReadMeter.Api.Contracts.Requests;
+using System.Data;
+using System.Data.Common;
+using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 
 namespace ReadMeter.Api.Businesses;
 
 public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 {
+    private const string GetMeterReaderByCustomerUrl = "https://internal-api.dawaco.com.vn/api/Ns00HoSoMain/getmabendoc";
     private readonly ReadMeterDbContext _context;
     private readonly BillingDbContext _billing;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public ReadMeterBusinesses(ReadMeterDbContext context, BillingDbContext billing)
+    public ReadMeterBusinesses(ReadMeterDbContext context, BillingDbContext billing, IHttpClientFactory httpClientFactory)
     {
         _context = context;
         _billing = billing;
+        _httpClientFactory = httpClientFactory;
     }
 
     private static ContentResult JsonObject(object value) => new()
@@ -26,90 +34,283 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         Content = JsonSerializer.Serialize(value)
     };
 
+    private static string? ExtractMeterReaderCode(string response)
+    {
+        var value = response.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.String)
+                return root.GetString()?.Trim();
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var name in new[] { "MA_BIEN_DOC", "ma_bien_doc", "maBienDoc", "mabendoc", "data", "result" })
+                {
+                    if (root.TryGetProperty(name, out var property))
+                        return property.ValueKind == JsonValueKind.String
+                            ? property.GetString()?.Trim()
+                            : property.ToString().Trim();
+                }
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return value.Trim('"').Trim();
+    }
+
+    private static object DbValue(object? value) => value ?? DBNull.Value;
+
+    private static OracleParameter Param(string name, object? value)
+    {
+        var parameter = new OracleParameter(name, DbValue(value));
+        if (value is string)
+            parameter.OracleDbType = OracleDbType.Varchar2;
+        return parameter;
+    }
+
+    private static OracleParameter NParam(string name, string? value)
+    {
+        return new OracleParameter(name, DbValue(value))
+        {
+            OracleDbType = OracleDbType.NVarchar2
+        };
+    }
+
+    private async Task<List<Dictionary<string, object?>>> QueryRowsAsync(
+        string sql, IEnumerable<OracleParameter> parameters, CancellationToken cancellationToken)
+    {
+        var connection = _context.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+        if (shouldClose)
+            await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandTimeout = 15;
+            if (command is OracleCommand oracleCommand)
+                oracleCommand.BindByName = true;
+            foreach (var parameter in parameters)
+                command.Parameters.Add(parameter);
+
+            var rows = new List<Dictionary<string, object?>>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                for (var i = 0; i < reader.FieldCount; i++)
+                    row[reader.GetName(i)] = await reader.IsDBNullAsync(i, cancellationToken) ? null : reader.GetValue(i);
+                rows.Add(row);
+            }
+            return rows;
+        }
+        finally
+        {
+            if (shouldClose)
+                await connection.CloseAsync();
+        }
+    }
+
+    private async Task<int> ExecuteNonQueryAsync(
+        string sql, IEnumerable<OracleParameter> parameters, CancellationToken cancellationToken)
+    {
+        var connection = _context.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+        if (shouldClose)
+            await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandTimeout = 15;
+            if (command is OracleCommand oracleCommand)
+                oracleCommand.BindByName = true;
+            foreach (var parameter in parameters)
+                command.Parameters.Add(parameter);
+
+            return await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        finally
+        {
+            if (shouldClose)
+                await connection.CloseAsync();
+        }
+    }
+
+    private async Task<string> NextNumericIdAsync(string tableName, string columnName, int length, CancellationToken cancellationToken)
+    {
+        var rows = await QueryRowsAsync($"""
+            SELECT LPAD(NVL(MAX(TO_NUMBER({columnName})), 0) + 1, :length, '0') NEXT_ID
+            FROM {tableName}
+            WHERE REGEXP_LIKE({columnName}, '^[0-9]+$')
+            """, new[] { Param("length", length) }, cancellationToken);
+
+        return rows[0]["NEXT_ID"]?.ToString() ?? "1".PadLeft(length, '0');
+    }
+
     private async Task<ContentResult> GetMeterBooks(
         string? meterReader, string? month, bool supplementalOnly, bool pendingOnly,
         CancellationToken cancellationToken)
     {
-        var query = _context.AppDhChiSo.AsNoTracking()
-            .Where(x => x.MA_BIEN_DOC == meterReader && x.THANG == month);
-        if (supplementalOnly)
-            query = query.Where(x => x.MA_TINH_TRANG_DH == "BS");
-        if (pendingOnly)
-            query = query.Where(x => x.NGAY_EBILL_NHAN_KHOA == null && x.NGAY_EBILL_NAP_BILL == null);
-
-        var grouped = await (
-            from reading in query
-            join book in _context.DmSoDoc.AsNoTracking()
-                on reading.MA_SO_DOC equals book.MA_SO_DOC
-            group new { reading, book } by new { reading.MA_SO_DOC, book.TEN_SO_DOC, book.NGAY_DOC } into values
-            orderby values.Key.MA_SO_DOC
-            select new
-            {
-                values.Key.MA_SO_DOC,
-                values.Key.TEN_SO_DOC,
-                values.Key.NGAY_DOC,
-                TRANG_THAI_SO = values.Any(x => x.reading.NGAY_BD_NHAN_KHOA != null) ? "Y" : "N",
-                TONG_DH = values.Count(),
-                TONG_DH_DA_DOC = values.Count(x => x.reading.NGAY_DOC_TUNG_DH != null),
-                TRANG_THAI_BG_SO = values.Any(x => x.reading.NGAY_BIEN_DOC_BG != null && x.reading.NGAY_EBILL_NHAN_KHOA == null) ? 2
-                    : values.Any(x => x.reading.NGAY_BD_NHAN_KHOA != null && x.reading.NGAY_BIEN_DOC_BG == null) ? 1 : 0
-            })
-            .ToListAsync(cancellationToken);
-
-        if (grouped.Count == 0)
-            return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } });
-        return JsonObject(grouped.Select((x, index) => new
+        var where = new StringBuilder("""
+            WHERE cs.MA_BIEN_DOC = :meterReader
+              AND cs.THANG = :month
+            """);
+        var parameters = new List<OracleParameter>
         {
-            ROOT = "00- OK",
-            STT = index + 1,
-            x.MA_SO_DOC,
-            x.TEN_SO_DOC,
-            x.NGAY_DOC,
-            x.TRANG_THAI_SO,
-            x.TONG_DH,
-            x.TONG_DH_DA_DOC,
-            TONG_DH_CHUA_DOC = x.TONG_DH - x.TONG_DH_DA_DOC,
-            x.TRANG_THAI_BG_SO
-        }));
+            Param("meterReader", meterReader),
+            Param("month", month)
+        };
+
+        if (supplementalOnly)
+            where.AppendLine("  AND cs.MA_TINH_TRANG_DH = 'BS'");
+        if (pendingOnly)
+            where.AppendLine("  AND cs.NGAY_EBILL_NHAN_KHOA IS NULL AND cs.NGAY_EBILL_NAP_BILL IS NULL");
+
+        var rows = await QueryRowsAsync($"""
+            SELECT
+                '00- OK' ROOT,
+                ROW_NUMBER() OVER (ORDER BY cs.MA_SO_DOC) STT,
+                cs.MA_SO_DOC,
+                sd.TEN_SO_DOC,
+                sd.NGAY_DOC,
+                CASE WHEN SUM(CASE WHEN cs.NGAY_BD_NHAN_KHOA IS NOT NULL THEN 1 ELSE 0 END) > 0 THEN 'Y' ELSE 'N' END TRANG_THAI_SO,
+                COUNT(*) TONG_DH,
+                SUM(CASE WHEN cs.NGAY_DOC_TUNG_DH IS NOT NULL THEN 1 ELSE 0 END) TONG_DH_DA_DOC,
+                COUNT(*) - SUM(CASE WHEN cs.NGAY_DOC_TUNG_DH IS NOT NULL THEN 1 ELSE 0 END) TONG_DH_CHUA_DOC,
+                CASE
+                    WHEN SUM(CASE WHEN cs.NGAY_BIEN_DOC_BG IS NOT NULL AND cs.NGAY_EBILL_NHAN_KHOA IS NULL THEN 1 ELSE 0 END) > 0 THEN 2
+                    WHEN SUM(CASE WHEN cs.NGAY_BD_NHAN_KHOA IS NOT NULL AND cs.NGAY_BIEN_DOC_BG IS NULL THEN 1 ELSE 0 END) > 0 THEN 1
+                    ELSE 0
+                END TRANG_THAI_BG_SO
+            FROM APP_DH_CHI_SO cs
+            JOIN DM_SO_DOC sd ON sd.MA_SO_DOC = cs.MA_SO_DOC
+            {where}
+            GROUP BY cs.MA_SO_DOC, sd.TEN_SO_DOC, sd.NGAY_DOC
+            ORDER BY cs.MA_SO_DOC
+            """, parameters, cancellationToken);
+
+        return JsonObject(rows.Count == 0
+            ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } }
+            : rows.Cast<object>());
+
     }
 
     private async Task<ContentResult> GetCustomersForReading(
         string? id, string? sequence, string? customerCode, string? customerName, string? address,
         string? phone, string? bookCode, string? meterReader, string? month, string? filter,
-        bool supplementalOnly, CancellationToken cancellationToken)
+        bool supplementalOnly, bool assignedBookOnly, CancellationToken cancellationToken)
     {
-        var query =
-            from reading in _context.AppDhChiSo.AsNoTracking()
-            join customer in _context.ThongTinKh.AsNoTracking()
-                on reading.MA_KHACH_HANG equals customer.MA_KHACH_HANG
-            where reading.MA_SO_DOC == bookCode && reading.MA_BIEN_DOC == meterReader && reading.THANG == month
-            select new { reading, customer };
-        if (!string.IsNullOrWhiteSpace(id)) query = query.Where(x => x.reading.ID_DCS == id);
-        if (decimal.TryParse(sequence, out var sequenceValue)) query = query.Where(x => x.reading.STT_SO_DOC == sequenceValue);
-        if (!string.IsNullOrWhiteSpace(customerCode)) query = query.Where(x => x.customer.MA_KHACH_HANG.Contains(customerCode));
-        if (!string.IsNullOrWhiteSpace(customerName)) query = query.Where(x => x.customer.TEN_KHACH_HANG!.Contains(customerName));
-        if (!string.IsNullOrWhiteSpace(address)) query = query.Where(x => x.customer.DIA_CHI_DONG_HO!.Contains(address));
-        if (!string.IsNullOrWhiteSpace(phone)) query = query.Where(x => x.customer.PHONE_UT1!.Contains(phone));
-        if (filter == "1") query = query.Where(x => x.reading.NGAY_DOC_TUNG_DH != null);
-        if (filter == "2") query = query.Where(x => x.reading.NGAY_DOC_TUNG_DH == null);
-        if (supplementalOnly) query = query.Where(x => x.reading.MA_TINH_TRANG_DH == "BS");
+        var where = new StringBuilder();
+        var parameters = new List<OracleParameter>();
+        if (!string.IsNullOrWhiteSpace(id))
+        {
+            where.AppendLine("WHERE cs.ID_DCS = :id");
+            parameters.Add(Param("id", id));
+        }
+        else
+        {
+            where.AppendLine("""
+                WHERE cs.MA_SO_DOC = :bookCode
+                  AND cs.MA_BIEN_DOC = :meterReader
+                  AND cs.THANG = :month
+                """);
+            parameters.Add(Param("bookCode", bookCode));
+            parameters.Add(Param("meterReader", meterReader));
+            parameters.Add(Param("month", month));
 
-        var rows = await query.OrderBy(x => x.reading.STT_SO_DOC_MOI ?? x.reading.STT_SO_DOC)
-            .Select(x => new
-            {
-                ROOT = "00- OK", ID_DONG_HO = x.reading.ID_DCS, x.customer.MA_KHACH_HANG,
-                x.customer.TEN_KHACH_HANG, x.customer.DIA_CHI_DONG_HO, x.customer.TEN_DONG_HO,
-                CO_DH = x.customer.MA_DONG_HO, x.customer.HT_KD, x.customer.SO_SERIAL_DONG_HO,
-                PHONE_UT1 = x.customer.PHONE_UT1, EMAIL_UT1 = x.customer.EMAIL_UT1,
-                x.reading.CHI_SO_CU, x.reading.CHI_SO_MOI, x.reading.SAN_LUONG_TT, x.reading.TONG_SL,
-                x.reading.MA_TINH_TRANG_DH, x.reading.STT_SO_DOC, x.reading.STT_SO_DOC_MOI,
-                x.reading.NGAY_DOC_DK, x.reading.NGAY_DOC_CS, x.reading.NGAY_DOC_TUNG_DH,
-                x.reading.QUA_VONG, x.reading.LOAI_CHI_SO, x.reading.CONG_CHI_SO,
-                x.reading.SAN_LUONG_DUNG_IT, x.reading.MA_GHI_CHU, x.reading.GHI_CHU,
-                x.reading.VI_TRI_DOC, x.reading.TEN_FILE_ANH, x.reading.SL_TB_3THANG
-            })
-            .ToListAsync(cancellationToken);
-        return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } } : rows.Cast<object>());
+            if (assignedBookOnly)
+                where.AppendLine("  AND cs.NGAY_EBILL_NHAN_KHOA IS NULL AND cs.NGAY_EBILL_NAP_BILL IS NULL AND cs.NGAY_BD_NHAN_KHOA IS NOT NULL");
+        }
+
+        if (decimal.TryParse(sequence, out var rawSequenceValue))
+        {
+            where.AppendLine("  AND cs.STT_SO_DOC = :sequence");
+            parameters.Add(Param("sequence", rawSequenceValue));
+        }
+        if (filter == "1")
+            where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NOT NULL");
+        if (filter == "2")
+            where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NULL");
+        if (supplementalOnly)
+            where.AppendLine("  AND cs.MA_TINH_TRANG_DH = 'BS'");
+        if (!string.IsNullOrWhiteSpace(customerCode))
+        {
+            where.AppendLine("  AND kh.MA_KHACH_HANG LIKE :customerCode");
+            parameters.Add(Param("customerCode", $"%{customerCode}%"));
+        }
+        if (!string.IsNullOrWhiteSpace(customerName))
+        {
+            where.AppendLine("  AND UPPER(kh.TEN_KHACH_HANG) LIKE UPPER(:customerName)");
+            parameters.Add(NParam("customerName", $"%{customerName}%"));
+        }
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            where.AppendLine("  AND UPPER(kh.DIA_CHI_DONG_HO) LIKE UPPER(:address)");
+            parameters.Add(NParam("address", $"%{address}%"));
+        }
+        if (!string.IsNullOrWhiteSpace(phone))
+        {
+            where.AppendLine("  AND kh.PHONE_UT1 LIKE :phone");
+            parameters.Add(Param("phone", $"%{phone}%"));
+        }
+
+        var rows = await QueryRowsAsync($"""
+            SELECT
+                '00- OK' ROOT,
+                cs.ID_DCS ID_DONG_HO,
+                kh.MA_KHACH_HANG,
+                kh.TEN_KHACH_HANG,
+                kh.DIA_CHI_DONG_HO,
+                kh.TEN_DONG_HO,
+                kh.MA_DONG_HO CO_DH,
+                kh.HT_KD,
+                kh.SO_SERIAL_DONG_HO,
+                kh.PHONE_UT1,
+                kh.EMAIL_UT1,
+                kh.MA_GIA,
+                kh.SO_O_CUA_SO,
+                cs.CHI_SO_CU,
+                cs.CHI_SO_MOI,
+                cs.SAN_LUONG_TT,
+                cs.TONG_SL,
+                cs.MA_TINH_TRANG_DH,
+                cs.STT_SO_DOC,
+                cs.STT_SO_DOC_MOI,
+                cs.NGAY_DOC_DK,
+                cs.NGAY_DOC_CS,
+                cs.NGAY_DOC_TUNG_DH,
+                CASE WHEN cs.NGAY_DOC_TUNG_DH IS NOT NULL THEN 'Đã ghi' ELSE 'Chưa ghi' END TINH_TRANG_CS,
+                cs.QUA_VONG,
+                cs.LOAI_CHI_SO,
+                cs.CONG_CHI_SO,
+                cs.SAN_LUONG_DUNG_IT,
+                cs.MA_GHI_CHU,
+                cs.GHI_CHU,
+                cs.VI_TRI_DOC,
+                cs.VI_TRI_DOC_CU,
+                cs.TEN_FILE_ANH,
+                cs.SL_TB_3THANG
+            FROM APP_DH_CHI_SO cs
+            JOIN THONG_TIN_KH kh ON kh.MA_KHACH_HANG = cs.MA_KHACH_HANG
+            {where}
+              AND kh.NGAY_THANH_LY_HD IS NULL
+            ORDER BY NVL(cs.STT_SO_DOC_MOI, cs.STT_SO_DOC)
+            """, parameters, cancellationToken);
+
+        return JsonObject(rows.Count == 0
+            ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } }
+            : rows.Cast<object>());
+
     }
 
     private async Task<ContentResult> SaveMeterReading(
@@ -119,32 +320,70 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         string? customerCode, string? bookCode, string? month, string? branch, string? meterReader,
         CancellationToken cancellationToken)
     {
-        var query = _context.AppDhChiSo.Where(x => x.ID_DCS == id && x.MA_BIEN_DOC == meterReader);
-        if (!string.IsNullOrWhiteSpace(customerCode)) query = query.Where(x => x.MA_KHACH_HANG == customerCode);
-        if (!string.IsNullOrWhiteSpace(bookCode)) query = query.Where(x => x.MA_SO_DOC == bookCode);
-        if (!string.IsNullOrWhiteSpace(month)) query = query.Where(x => x.THANG == month);
-        if (!string.IsNullOrWhiteSpace(branch)) query = query.Where(x => x.MA_CHI_NHANH == branch);
-        var row = await query.FirstOrDefaultAsync(cancellationToken);
-        if (row is null) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+        static decimal FastNumber(string? value) => decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var number) ? number : 0;
+        var parsedReadingDate = DateTime.TryParseExact(
+            readingDate,
+            new[] { "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss", "yyyy-MM-dd" },
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var date)
+            ? date
+            : DateTime.Now;
 
-        static decimal Number(string? value) => decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var number) ? number : 0;
-        row.MA_TINH_TRANG_DH = status;
-        row.QUA_VONG = rollover;
-        row.LOAI_CHI_SO = readingType;
-        row.NGAY_DOC_CS = DateTime.TryParseExact(readingDate, new[] { "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss", "yyyy-MM-dd" }, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : DateTime.Now;
-        row.CHI_SO_MOI = Number(currentReading);
-        row.SAN_LUONG_TT = Number(actualUsage);
-        row.TONG_SL = Number(totalUsage);
-        row.CONG_CHI_SO = Number(accumulatedReading);
-        row.SAN_LUONG_DUNG_IT = Number(lowUsage);
-        row.MA_GHI_CHU = noteCode;
-        row.GHI_CHU = note;
-        row.VI_TRI_DOC_CU = row.VI_TRI_DOC;
-        row.VI_TRI_DOC = location;
-        row.NGAY_DOC_TUNG_DH = DateTime.Now;
-        row.LOG_USER = meterReader;
-        await _context.SaveChangesAsync(cancellationToken);
-        return JsonObject(new[] { new { ROOT = "00- OK" } });
+        var sql = new StringBuilder("""
+            UPDATE APP_DH_CHI_SO
+            SET MA_TINH_TRANG_DH = :status,
+                QUA_VONG = :rollover,
+                LOAI_CHI_SO = :readingType,
+                NGAY_DOC_CS = :readingDate,
+                CHI_SO_MOI = :currentReading,
+                SAN_LUONG_TT = :actualUsage,
+                TONG_SL = :totalUsage,
+                CONG_CHI_SO = :accumulatedReading,
+                SAN_LUONG_DUNG_IT = :lowUsage,
+                MA_GHI_CHU = :noteCode,
+                GHI_CHU = :note,
+                VI_TRI_DOC_CU = VI_TRI_DOC,
+                VI_TRI_DOC = :location,
+                NGAY_DOC_TUNG_DH = SYSDATE,
+                LOG_USER = :meterReader
+            WHERE ID_DCS = :id
+              AND MA_BIEN_DOC = :meterReader
+            """);
+
+        var parameters = new List<OracleParameter>
+        {
+            Param("status", status),
+            Param("rollover", rollover),
+            Param("readingType", readingType),
+            Param("readingDate", parsedReadingDate),
+            Param("currentReading", FastNumber(currentReading)),
+            Param("actualUsage", FastNumber(actualUsage)),
+            Param("totalUsage", FastNumber(totalUsage)),
+            Param("accumulatedReading", FastNumber(accumulatedReading)),
+            Param("lowUsage", FastNumber(lowUsage)),
+            Param("noteCode", noteCode),
+            NParam("note", note),
+            Param("location", location),
+            Param("meterReader", meterReader),
+            Param("id", id)
+        };
+
+        static void AddOptionalFilter(StringBuilder sql, List<OracleParameter> parameters, string column, string name, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            sql.AppendLine($"  AND {column} = :{name}");
+            parameters.Add(Param(name, value));
+        }
+
+        AddOptionalFilter(sql, parameters, "MA_KHACH_HANG", "customerCode", customerCode);
+        AddOptionalFilter(sql, parameters, "MA_SO_DOC", "bookCode", bookCode);
+        AddOptionalFilter(sql, parameters, "THANG", "month", month);
+        AddOptionalFilter(sql, parameters, "MA_CHI_NHANH", "branch", branch);
+
+        var affectedRows = await ExecuteNonQueryAsync(sql.ToString(), parameters, cancellationToken);
+        return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- Dữ liệu không tìm thấy." : "00- OK" } });
+
     }
 
     public Task<ContentResult> P_00_KET_NOI_DB_CHECK(string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
@@ -158,8 +397,35 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
             return JsonObject(new[] { new { ROOT = "11- Tên đăng nhập không đúng." } });
         if (employee.PAS != PASSWORD)
             return JsonObject(new[] { new { ROOT = "12- Mật khẩu không đúng." } });
-        if (employee.IMEI != SO_IMEI && employee.IMEI_SUB != SO_IMEI && employee.IMEI_SUB2 != SO_IMEI)
-            return JsonObject(new[] { new { ROOT = "13- Thiết bị không hợp lệ." } });
+        return JsonObject(new[] { new { ROOT = "00- OK", MA_BIEN_DOC = employee.MA_NHAN_VIEN, MA_XI_NGHIEP = employee.MA_CHI_NHANH } });
+    }
+
+    public async Task<ContentResult> DANGNHAPTHEOMANLD(string? MA_KHACH_HANG, string? PASS, string? SO_DIEN_THOAI, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+
+        var client = _httpClientFactory.CreateClient();
+        using var response = await client.PostAsJsonAsync(GetMeterReaderByCustomerUrl, new
+        {
+            ma_khach_hang = MA_KHACH_HANG,
+            pass = PASS,
+            so_dien_thoai = SO_DIEN_THOAI
+        }, timeout.Token);
+
+        if (!response.IsSuccessStatusCode)
+            return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        var responseText = await response.Content.ReadAsStringAsync(timeout.Token);
+        var meterReader = ExtractMeterReaderCode(responseText);
+        if (string.IsNullOrWhiteSpace(meterReader))
+            return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        var employee = await _context.DmNhanVien.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.MA_NHAN_VIEN == meterReader, cancellationToken);
+        if (employee is null)
+            return JsonObject(new[] { new { ROOT = "11- Tên đăng nhập không đúng." } });
+
         return JsonObject(new[] { new { ROOT = "00- OK", MA_BIEN_DOC = employee.MA_NHAN_VIEN, MA_XI_NGHIEP = employee.MA_CHI_NHANH } });
     }
 
@@ -235,16 +501,16 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     }
 
     public Task<ContentResult> P_03_LAY_DS_KHACH_HANG(string? ID_DOC_opt, string? STT_SO_DOC_opt, string? MA_KH_opt, string? TEN_KH_opt, string? DIA_CHI_DH_opt, string? PHONE_KH_opt, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? KIEU_LOC, string? SAP_XEP_THEO, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, false, cancellationToken);
+        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, false, true, cancellationToken);
 
     public Task<ContentResult> P_03_LAY_DS_KHACH_HANG_SUB(string? ID_DOC_opt, string? STT_SO_DOC_opt, string? MA_KH_opt, string? TEN_KH_opt, string? DIA_CHI_DH_opt, string? PHONE_KH_opt, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? KIEU_LOC, string? SAP_XEP_THEO, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, false, cancellationToken);
+        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, false, true, cancellationToken);
 
     public Task<ContentResult> P_03_LAY_DS_KHACH_HANG_SUB_BS(string? ID_DOC_opt, string? STT_SO_DOC_opt, string? MA_KH_opt, string? TEN_KH_opt, string? DIA_CHI_DH_opt, string? PHONE_KH_opt, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? KIEU_LOC, string? SAP_XEP_THEO, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, true, cancellationToken);
+        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, true, true, cancellationToken);
 
     public Task<ContentResult> P_0313_LAY_DS_KHACH_HANG_TRA_CUU(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        GetCustomersForReading(null, null, null, null, null, null, MA_SO_DOC, MA_BIEN_DOC, THANG, "0", false, cancellationToken);
+        GetCustomersForReading(null, null, null, null, null, null, MA_SO_DOC, MA_BIEN_DOC, THANG, "0", false, false, cancellationToken);
 
     public async Task<ContentResult> P_043_LO_TRINH_DI_DOC_MAP(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
@@ -287,13 +553,202 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     public Task<ContentResult> P_041_NHAP_XUAT_CS_LE_ONLINE(string? ID_DONG_HO, string? MA_TINH_TRANG_DH, string? QUA_VONG, string? LOAI_CHI_SO, string? NGAY_DOC_CS, string? CHI_SO_MOI, string? SAN_LUONG_TT, string? TONG_SL, string? CONG_CHI_SO, string? SAN_LUONG_DUNG_IT, string? MA_GHI_CHU, string? GHI_CHU, string? VI_TRI_DOC, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
         SaveMeterReading(ID_DONG_HO, MA_TINH_TRANG_DH, QUA_VONG, LOAI_CHI_SO, NGAY_DOC_CS, CHI_SO_MOI, SAN_LUONG_TT, TONG_SL, CONG_CHI_SO, SAN_LUONG_DUNG_IT, MA_GHI_CHU, GHI_CHU, VI_TRI_DOC, null, null, null, null, MA_BIEN_DOC, cancellationToken);
 
-    public async Task<ContentResult> P_045_CANH_BAO_SAN_LUONG_LON(string? ID_DONG_HO, string? MA_KHACH_HANG, string? MA_BIEN_DOC, long TONG_SL, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    public async Task<ContentResult> P_045_CANH_BAO_SAN_LUONG_LON(
+    string? ID_DONG_HO,
+    string? MA_KHACH_HANG,
+    string? MA_BIEN_DOC,
+    long TONG_SL,
+    string? SO_IMEI,
+    string? PASSWORD_K,
+    CancellationToken cancellationToken)
     {
-        var employee = await _context.DmNhanVien.AsNoTracking().FirstOrDefaultAsync(x => x.MA_NHAN_VIEN == MA_BIEN_DOC, cancellationToken);
-        var reading = await _context.AppDhChiSo.AsNoTracking().FirstOrDefaultAsync(x => x.ID_DCS == ID_DONG_HO && x.MA_KHACH_HANG == MA_KHACH_HANG, cancellationToken);
-        if (reading is null) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy.", CANH_BAO = false } });
-        var threshold = employee?.CANH_BAO_M3 ?? 0;
-        return JsonObject(new[] { new { ROOT = "00- OK", CANH_BAO = threshold > 0 && TONG_SL >= threshold, SAN_LUONG = TONG_SL, NGUONG = threshold } });
+        try
+        {
+            // ============================================================
+            // NGƯỠNG - GIỮ NGUYÊN VB GỐC
+            // ============================================================
+
+            const decimal TG_tyLeTang = 30m;
+            const long TG_m3Tang = 50L;
+
+            const decimal TG_tyLeGiam = 30m;
+            const long TG_m3Giam = 50L;
+
+            const decimal CQ_tyLeTang = 30m;
+            const long CQ_m3Tang = 100L;
+
+            const decimal CQ_tyLeGiam = 30m;
+            const long CQ_m3Giam = 100L;
+
+
+            // ============================================================
+            // CHỈ 1 LẦN ĐI DATABASE
+            //
+            // VB:
+            // 1. SL_TB_3THANG:
+            //    MA_BIEN_DOC + ID_DCS
+            //
+            // 2. Cơ quan:
+            //    MA_KHACH_HANG + LOAI_KHACH_HANG = "N"
+            //
+            // Any() sẽ dịch thành EXISTS.
+            // ============================================================
+
+            var info = await _context.AppDhChiSo
+                .AsNoTracking()
+                .Where(x =>
+                    x.MA_BIEN_DOC == MA_BIEN_DOC &&
+                    x.ID_DCS == ID_DONG_HO)
+                .Select(x => new
+                {
+                    x.SL_TB_3THANG,
+
+                    LA_CO_QUAN = _context.ThongTinKh
+                        .Any(k =>
+                            k.MA_KHACH_HANG == MA_KHACH_HANG &&
+                            k.LOAI_KHACH_HANG == "N")
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+
+            // ============================================================
+            // VB:
+            //
+            // Val(GetValueField(...))
+            // Nếu không có => 0
+            //
+            // If slTB3T <= 0 Then Return ""
+            // ============================================================
+
+            if (info == null)
+                return TextResult("");
+
+            long slTB3T = Convert.ToInt64(
+                info.SL_TB_3THANG ?? 0);
+
+            if (slTB3T <= 0)
+                return TextResult("");
+
+
+            // ============================================================
+            // ĐÚNG VB:
+            //
+            // loaiKH = "N" => cơ quan
+            // ============================================================
+
+            bool laCoQuan = info.LA_CO_QUAN;
+
+
+            decimal nguongTangPT =
+                laCoQuan
+                    ? CQ_tyLeTang
+                    : TG_tyLeTang;
+
+            long nguongTangM3 =
+                laCoQuan
+                    ? CQ_m3Tang
+                    : TG_m3Tang;
+
+            decimal nguongGiamPT =
+                laCoQuan
+                    ? CQ_tyLeGiam
+                    : TG_tyLeGiam;
+
+            long nguongGiamM3 =
+                laCoQuan
+                    ? CQ_m3Giam
+                    : TG_m3Giam;
+
+
+            string m = "";
+
+
+            // ============================================================
+            // KIỂM TRA TĂNG - GIỐNG VB
+            // ============================================================
+
+            if (TONG_SL > slTB3T)
+            {
+                long tangM3 =
+                    TONG_SL - slTB3T;
+
+                decimal tangPT =
+                    Math.Round(
+                        tangM3 * 100m / slTB3T,
+                        2);
+
+                if (tangPT >= nguongTangPT &&
+                    tangM3 >= nguongTangM3)
+                {
+                    m =
+                        "Cảnh báo sản lượng TĂNG hơn " +
+                        nguongTangPT +
+                        "% và hơn " +
+                        nguongTangM3 +
+                        "m3 (so với BQ3T)." +
+                        Environment.NewLine +
+                        "Tỷ lệ thực tế tăng " +
+                        tangPT.ToString("N2") +
+                        "%, tương ứng tăng " +
+                        tangM3.ToString("N0") +
+                        "m3.";
+                }
+            }
+
+
+            // ============================================================
+            // KIỂM TRA GIẢM - GIỐNG VB
+            // ============================================================
+
+            if (TONG_SL < slTB3T)
+            {
+                long giamM3 =
+                    slTB3T - TONG_SL;
+
+                decimal giamPT =
+                    Math.Round(
+                        giamM3 * 100m / slTB3T,
+                        2);
+
+                if (giamPT >= nguongGiamPT &&
+                    giamM3 >= nguongGiamM3)
+                {
+                    m =
+                        "Cảnh báo sản lượng GIẢM hơn " +
+                        nguongGiamPT +
+                        "% và hơn " +
+                        nguongGiamM3 +
+                        "m3 (so với BQ3T)." +
+                        Environment.NewLine +
+                        "Tỷ lệ thực tế giảm " +
+                        giamPT.ToString("N2") +
+                        "%, tương ứng giảm " +
+                        giamM3.ToString("N0") +
+                        "m3.";
+                }
+            }
+
+
+            // VB:
+            // Return m
+            return TextResult(m);
+        }
+        catch (Exception ex)
+        {
+            return TextResult(
+                $"99- Lỗi không xác định ({ex.Message})");
+        }
+
+
+        ContentResult TextResult(string value)
+        {
+            return new ContentResult
+            {
+                Content = value,
+                ContentType = "text/plain; charset=utf-8",
+                StatusCode = 200
+            };
+        }
     }
 
     public async Task<ContentResult> P_045_LUU_XEP_SO_DOC(string? ID_DONG_HO, string? MA_KHACH_HANG, string? STT_CU, string? STT_MOI, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
@@ -318,46 +773,489 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     public async Task<ContentResult> P_05_BD_BAN_GIAO_CS_XONG(string? DANH_SACH_MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.AppDhChiSo.Where(x => x.NGAY_EBILL_NHAN_KHOA == null && x.NGAY_EBILL_NAP_BILL == null && x.NGAY_BD_NHAN_KHOA != null && x.MA_BIEN_DOC == MA_BIEN_DOC && x.THANG == THANG && x.MA_SO_DOC == DANH_SACH_MA_SO_DOC).ToListAsync(cancellationToken);
-        if (rows.Any(x => x.NGAY_DOC_TUNG_DH == null))
+        var readingBooks = (DANH_SACH_MA_SO_DOC ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.Trim('\'', '"'))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToArray();
+
+        if (readingBooks.Length == 0)
+            return JsonObject(new[] { new { ROOT = "01- Thieu ma so doc!" } });
+
+        var query = _context.AppDhChiSo
+            .Where(x =>
+                x.NGAY_EBILL_NHAN_KHOA == null &&
+                x.NGAY_EBILL_NAP_BILL == null &&
+                x.NGAY_BD_NHAN_KHOA != null &&
+                x.MA_BIEN_DOC == MA_BIEN_DOC &&
+                x.THANG == THANG &&
+                x.MA_SO_DOC != null &&
+                readingBooks.Contains(x.MA_SO_DOC));
+
+        var hasUnreadMeter = await query
+            .AsNoTracking()
+            .AnyAsync(x => x.NGAY_DOC_TUNG_DH == null, cancellationToken);
+
+        if (hasUnreadMeter)
             return JsonObject(new[] { new { ROOT = "18- Chưa đọc xong. Vui lòng kiểm tra lại!" } });
-        var now = DateTime.Now;
-        foreach (var row in rows) row.NGAY_BIEN_DOC_BG = now;
-        await _context.SaveChangesAsync(cancellationToken);
+
+        await query.ExecuteUpdateAsync(
+            setters => setters.SetProperty(x => x.NGAY_BIEN_DOC_BG, DateTime.Now),
+            cancellationToken);
+
         return JsonObject(new[] { new { ROOT = "00- OK" } });
     }
 
     public async Task<ContentResult> P_81_LAY_TT_KHACH_HANG(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrEmpty(MA_KHACH_HANG) && MA_KHACH_HANG.Length != 9)
-            return JsonObject(new[] { new { ROOT = $"15- Độ dài dữ liệu không hợp lệ (MKH: {MA_KHACH_HANG})" } });
-        var debt = await _context.CongNo.AsNoTracking()
-            .Where(x => x.MA_KHACH_HANG == MA_KHACH_HANG && (x.TRANG_THAI == 1 || x.TRANG_THAI == 4))
-            .SumAsync(x => (decimal?)(x.TONG_TIEN - (x.TONG_THANH_TOAN_BILL ?? 0)), cancellationToken) ?? 0;
-        var average = await _context.ChiSoDhSub.AsNoTracking()
-            .Where(x => x.MA_KHACH_HANG == MA_KHACH_HANG && x.SLTB3T > 0)
-            .OrderByDescending(x => x.ID_CS)
-            .Select(x => x.SLTB3T)
-            .FirstOrDefaultAsync(cancellationToken);
-        var row = await _context.ThongTinKh.AsNoTracking()
-            .Where(x => x.MA_KHACH_HANG == MA_KHACH_HANG && x.NGAY_THANH_LY_HD == null)
+        var maKh = MA_KHACH_HANG ?? string.Empty;
+        if (!string.IsNullOrEmpty(maKh) && maKh.Length != 9)
+            return JsonObject(new[] { new { ROOT = $"15- Do dai du lieu khong hop le (MKH: {maKh})" } });
+
+        var totalWatch = Stopwatch.StartNew();
+        var stepWatch = Stopwatch.StartNew();
+
+        var customer = await _context.ThongTinKh
+            .AsNoTracking()
+            .Where(x => x.MA_KHACH_HANG == maKh && x.NGAY_THANH_LY_HD == null)
             .Select(x => new
             {
-                ROOT = "00- OK", x.MA_KHACH_HANG, x.TEN_KHACH_HANG, x.DIA_CHI_KHACH_HANG,
-                DIA_CHI_LAP_DAT = x.DIA_CHI_DONG_HO, DIEN_THOAI = x.PHONE_UT1, EMAIL = x.EMAIL_UT1,
-                x.SO_HOP_DONG, x.SO_HO, x.SO_KHAU, x.DINH_MUC, x.MA_GIA, x.TEN_GIA_NUOC,
-                SERIAL_DH = x.SO_SERIAL_DONG_HO, x.TEN_DONG_HO, x.NGAY_LAP_DAT, x.BIEN_DOC,
-                MUC_DICH_SU_DUNG = x.HT_KD, XN_CAP_NUOC = x.CHI_NHANH
+                x.MA_KHACH_HANG,
+                x.TEN_KHACH_HANG,
+                x.DIA_CHI_KHACH_HANG,
+                DIA_CHI_LAP_DAT = x.DIA_CHI_DONG_HO,
+                DIEN_THOAI = x.PHONE_UT1,
+                EMAIL = x.EMAIL_UT1,
+                x.SO_HOP_DONG,
+                x.SO_HO,
+                x.SO_KHAU,
+                x.DINH_MUC,
+                x.MA_GIA,
+                x.TEN_GIA_NUOC,
+                SERIAL_DH = x.SO_SERIAL_DONG_HO,
+                x.TEN_DONG_HO,
+                x.NGAY_LAP_DAT,
+                x.BIEN_DOC,
+                MUC_DICH_SU_DUNG = x.HT_KD,
+                XN_CAP_NUOC = x.CHI_NHANH
             })
             .FirstOrDefaultAsync(cancellationToken);
-        if (row is null)
-            return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } });
-        return JsonObject(new object[] { new { row.ROOT, row.MA_KHACH_HANG, row.TEN_KHACH_HANG, row.DIA_CHI_KHACH_HANG,
-            row.DIA_CHI_LAP_DAT, row.DIEN_THOAI, row.EMAIL, row.SO_HOP_DONG, row.SO_HO, row.SO_KHAU, row.DINH_MUC,
-            row.MA_GIA, row.TEN_GIA_NUOC, row.SERIAL_DH, row.TEN_DONG_HO, row.NGAY_LAP_DAT, row.BIEN_DOC,
-            row.MUC_DICH_SU_DUNG, row.XN_CAP_NUOC, DU_NO = debt, BQ3T = average ?? 0 } });
+
+        var customerMs = stepWatch.ElapsedMilliseconds;
+        if (customer is null)
+            return JsonObject(new[] { new { ROOT = "16- Du lieu khong tim thay. Vui long kiem tra lai!" } });
+
+        stepWatch.Restart();
+        var duNo = await GetTongDuNoTheoMaKhV2Async(maKh, cancellationToken);
+        var debtMs = stepWatch.ElapsedMilliseconds;
+
+        stepWatch.Restart();
+        var bq3t = await _context.ChiSoDhSub
+            .AsNoTracking()
+            .Where(x =>
+                x.MA_KHACH_HANG == maKh &&
+                x.SLTB3T > 0)
+            .Select(x => x.SLTB3T)
+            .FirstOrDefaultAsync(cancellationToken);
+        var averageMs = stepWatch.ElapsedMilliseconds;
+
+        var ngayLapDat = customer.NGAY_LAP_DAT?.ToString("dd/MM/yyyy") ?? string.Empty;
+        var result = new[]
+        {
+            new
+            {
+                ROOT = "00- OK",
+                customer.MA_KHACH_HANG,
+                customer.TEN_KHACH_HANG,
+                customer.DIA_CHI_KHACH_HANG,
+                customer.DIA_CHI_LAP_DAT,
+                customer.DIEN_THOAI,
+                customer.EMAIL,
+                customer.SO_HOP_DONG,
+                customer.SO_HO,
+                customer.SO_KHAU,
+                customer.DINH_MUC,
+                customer.MA_GIA,
+                customer.TEN_GIA_NUOC,
+                customer.SERIAL_DH,
+                customer.TEN_DONG_HO,
+                NGAY_LAP_DAT = ngayLapDat,
+                customer.BIEN_DOC,
+                customer.MUC_DICH_SU_DUNG,
+                customer.XN_CAP_NUOC,
+                DU_NO = duNo,
+                BQ3T = bq3t
+            }
+        };
+
+        Console.WriteLine($"P_81 timings MA_KHACH_HANG={maKh}: KH={customerMs}ms, DU_NO={debtMs}ms, BQ3T={averageMs}ms, TOTAL={totalWatch.ElapsedMilliseconds}ms");
+        return JsonObject(result);
     }
 
+    // ======================================================================
+    // GET TỔNG DƯ NỢ THEO MÃ KHÁCH HÀNG
+    // Convert từ: get_Tong_Du_No_Theo_maKH_V2
+    // ======================================================================
+    private async Task<string> GetTongDuNoTheoMaKhV2Async(
+        string maKH,
+        CancellationToken cancellationToken = default)
+    {
+        long tienNo;
+        var dieuChinhGiamDau = await _context.CongNo
+            .AsNoTracking()
+            .Where(x =>
+                x.MA_KHACH_HANG == maKH &&
+                x.TONG_TIEN < 0 &&
+                x.TRANG_THAI == 1 &&
+                x.MA_DON_VI == 0 &&
+                x.LOAI_HOA_DON == 5)
+            .OrderByDescending(x => x.NGAY_HD_PHAT_HANH)
+            .Select(x => new
+            {
+                x.TONG_TIEN,
+                x.SO_HOA_DON_THAY_THE
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (dieuChinhGiamDau is not null)
+        {
+            tienNo = await GetTongTienNoDieuChinhSubAsync(
+                maKH,
+                dieuChinhGiamDau.TONG_TIEN,
+                dieuChinhGiamDau.SO_HOA_DON_THAY_THE,
+                cancellationToken);
+        }
+        else
+        {
+            // VB:
+            //
+            // SELECT SUM(
+            //      TONG_TIEN
+            //      - TONG_THANH_TOAN_BILL
+            //      - TONG_TIEN_GIAM_TRU
+            // )
+            // FROM CONG_NO
+            // WHERE MA_KHACH_HANG = maKH
+            // AND TRANG_THAI = 1
+            // AND MA_DON_VI = 0
+            // AND TONG_TIEN >
+            //     (TONG_THANH_TOAN_BILL + TONG_TIEN_GIAM_TRU)
+            // AND LOAI_HOA_DON <> '5'
+
+            var tongNo = await _context.CongNo
+                .AsNoTracking()
+                .Where(x =>
+                    x.MA_KHACH_HANG == maKH &&
+                    x.TRANG_THAI == 1 &&
+                    x.MA_DON_VI == 0 &&
+                    x.LOAI_HOA_DON != 5)
+                .Select(x => new
+                {
+                    Total = x.TONG_TIEN ?? 0,
+                    Paid = (x.TONG_THANH_TOAN ?? 0) > (x.TONG_THANH_TOAN_BILL ?? 0)
+                        ? (x.TONG_THANH_TOAN ?? 0)
+                        : (x.TONG_THANH_TOAN_BILL ?? 0),
+                    Discount = x.TONG_TIEN_GIAM_TRU ?? 0
+                })
+                .Where(x => x.Total > x.Paid + x.Discount)
+                .Select(x => (decimal?)(x.Total - x.Paid - x.Discount))
+                .SumAsync(cancellationToken);
+
+            tienNo = Convert.ToInt64(tongNo ?? 0m);
+        }
+
+        if (tienNo <= 0)
+            return "Hết nợ";
+
+        return tienNo.ToString(CultureInfo.InvariantCulture);
+    }
+
+
+    // ======================================================================
+    // KIỂM TRA KHÁCH HÀNG CÓ HÓA ĐƠN ĐIỀU CHỈNH GIẢM KHÔNG
+    // Convert từ: kiem_tra_dc_giam
+    // ======================================================================
+    private async Task<bool> KiemTraDcGiamAsync(
+        string custId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.CongNo
+            .AsNoTracking()
+            .AnyAsync(x =>
+                x.MA_KHACH_HANG == custId &&
+                x.TONG_TIEN < 0 &&
+                x.TRANG_THAI == 1 &&
+                x.MA_DON_VI == 0 &&
+                x.LOAI_HOA_DON == 5,
+                cancellationToken);
+    }
+
+
+    // ======================================================================
+    // TÍNH TỔNG TIỀN NỢ KHI CÓ ĐIỀU CHỈNH GIẢM
+    // Convert từ:
+    // get_tong_tien_no_dieu_chinh_sub
+    // +
+    // get_sql_dieu_chinh_giam
+    //
+    // Không cần get_sql_dieu_chinh_giam nữa.
+    // Toàn bộ điều kiện được chuyển thành LINQ.
+    // ======================================================================
+    private async Task<long> GetTongTienNoDieuChinhSubAsync(
+        string custId,
+        decimal? tongTienDieuChinhGiam,
+        string? soHoaDonThayTheDau,
+        CancellationToken cancellationToken = default)
+    {
+        var shdCanDcGiam = soHoaDonThayTheDau?.Trim() ?? string.Empty;
+        var tongTienDcGiamGoc = Math.Abs(tongTienDieuChinhGiam ?? 0m);
+
+        if (string.IsNullOrWhiteSpace(shdCanDcGiam))
+            return 0L;
+
+        var dsSoHoaDonThayThe = await _context.CongNo
+            .AsNoTracking()
+            .Where(x =>
+                x.MA_KHACH_HANG == custId &&
+                x.TONG_TIEN < 0 &&
+                x.TRANG_THAI == 1 &&
+                x.MA_DON_VI == 0 &&
+                x.LOAI_HOA_DON == 5 &&
+                x.SO_HOA_DON_THAY_THE != null)
+            .Select(x => x.SO_HOA_DON_THAY_THE!)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+// ------------------------------------------------------------------
+        // 4. LẤY HÓA ĐƠN GỐC CẦN ĐIỀU CHỈNH
+        //
+        // VB:
+        //
+        // SELECT
+        //      NGAY_HD_PHAT_HANH,
+        //      TONG_THANH_TOAN_BILL,
+        //      TONG_TIEN
+        // FROM CONG_NO
+        // WHERE SO_HOA_DON = shd_can_dc_giam
+        // ------------------------------------------------------------------
+
+        var hoaDonCanDc = await _context.CongNo
+            .AsNoTracking()
+            .Where(x => x.SO_HOA_DON == shdCanDcGiam)
+            .Select(x => new
+            {
+                x.NGAY_HD_PHAT_HANH,
+                x.TONG_THANH_TOAN_BILL,
+                x.TONG_TIEN
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (hoaDonCanDc == null)
+            return 0L;
+
+
+        var tongTienCanDcGiam =
+            Convert.ToDecimal(hoaDonCanDc.TONG_TIEN);
+
+        var tongTtCanDcGiam =
+            Convert.ToDecimal(hoaDonCanDc.TONG_THANH_TOAN_BILL);
+
+
+        // ------------------------------------------------------------------
+        // 5. KHOẢNG NGÀY
+        //
+        // VB:
+        //
+        // ngày HĐ phát hành - 300 ngày
+        // đến Now.Date
+        //
+        // Chú ý:
+        // Now.Date là 00:00:00 của ngày hiện tại.
+        // Giữ nguyên để giống VB.
+        // ------------------------------------------------------------------
+
+        if (hoaDonCanDc.NGAY_HD_PHAT_HANH == null)
+            return 0L;
+
+        var ngayPhatHanh =
+            Convert.ToDateTime(hoaDonCanDc.NGAY_HD_PHAT_HANH);
+
+        var tuNgay =
+            ngayPhatHanh.Date.AddDays(-300);
+
+        var denNgay =
+            DateTime.Today;
+
+
+        // ------------------------------------------------------------------
+        // 6. QUERY CHÍNH
+        //
+        // VB:
+        //
+        // SELECT
+        //   (
+        //      TONG_TIEN
+        //      - (TONG_THANH_TOAN_BILL - TONG_TIEN_GIAM_TRU)
+        //   ) AS tien
+        //
+        // FROM CONG_NO
+        //
+        // WHERE
+        //      MA_KHACH_HANG = custId
+        //      AND TRANG_THAI = 1
+        //      AND MA_DON_VI = 0
+        //
+        // ------------------------------------------------------------------
+
+        var query = _context.CongNo
+            .AsNoTracking()
+            .Where(x =>
+                x.MA_KHACH_HANG == custId &&
+                x.TRANG_THAI == 1 &&
+                x.MA_DON_VI == 0);
+
+
+        // ==================================================================
+        // TRƯỜNG HỢP 1
+        //
+        // HÓA ĐƠN CẦN ĐIỀU CHỈNH ĐÃ THANH TOÁN ĐỦ
+        //
+        // tong_tien_can_dc_giam = tong_tt_can_dc_giam
+        // ==================================================================
+
+        if (tongTienCanDcGiam == tongTtCanDcGiam)
+        {
+            // VB:
+            //
+            // If tong_tt_can_dc_giam >= tong_tien_dc_GIAM_GOC Then
+
+            if (tongTtCanDcGiam >= tongTienDcGiamGoc)
+            {
+                query = query.Where(x =>
+                    x.LOAI_HOA_DON == 5 &&
+
+                    x.TONG_TIEN >
+                        (
+                            x.TONG_THANH_TOAN_BILL +
+                            x.TONG_TIEN_GIAM_TRU
+                        ) &&
+
+                    x.NGAY_HD_PHAT_HANH >= tuNgay &&
+                    x.NGAY_HD_PHAT_HANH <= denNgay);
+            }
+            else
+            {
+                // VB không tạo thêm SQL trong trường hợp này.
+                // get_sql_dieu_chinh_giam trả chuỗi rỗng
+                // => get_tong_tien_no_dieu_chinh_sub trả 0.
+                return 0L;
+            }
+        }
+
+        // ==================================================================
+        // TRƯỜNG HỢP 2
+        //
+        // HÓA ĐƠN CHƯA THANH TOÁN
+        // HOẶC CHỈ THANH TOÁN MỘT PHẦN
+        //
+        // tong_tien_can_dc_giam > tong_tt_can_dc_giam
+        // ==================================================================
+
+        else if (tongTienCanDcGiam > tongTtCanDcGiam)
+        {
+            // --------------------------------------------------------------
+            // Tiền điều chỉnh giảm + tiền đã thanh toán
+            // đúng bằng tổng tiền hóa đơn.
+            //
+            // => hóa đơn cần điều chỉnh đã được chấm hết nợ.
+            // --------------------------------------------------------------
+
+            if (tongTienCanDcGiam ==
+                (tongTienDcGiamGoc + tongTtCanDcGiam))
+            {
+                query = query.Where(x =>
+                    x.LOAI_HOA_DON != 5 &&
+
+                    x.TONG_TIEN >
+                        (
+                            x.TONG_THANH_TOAN_BILL +
+                            x.TONG_TIEN_GIAM_TRU
+                        ) &&
+
+                    !dsSoHoaDonThayThe.Contains(x.SO_HOA_DON) &&
+
+                    x.NGAY_HD_PHAT_HANH >= tuNgay &&
+                    x.NGAY_HD_PHAT_HANH <= denNgay);
+            }
+
+            // --------------------------------------------------------------
+            // Chưa chấm hết hóa đơn điều chỉnh.
+            //
+            // VB:
+            //
+            // TONG_TIEN <>
+            // (TONG_THANH_TOAN_BILL + TONG_TIEN_GIAM_TRU)
+            // --------------------------------------------------------------
+
+            else
+            {
+                query = query.Where(x =>
+                    x.TONG_TIEN !=
+                        (
+                            x.TONG_THANH_TOAN_BILL +
+                            x.TONG_TIEN_GIAM_TRU
+                        ) &&
+
+                    x.NGAY_HD_PHAT_HANH >= tuNgay &&
+                    x.NGAY_HD_PHAT_HANH <= denNgay);
+            }
+        }
+
+        // ==================================================================
+        // VB không có nhánh xử lý nếu TONG_TIEN < TONG_THANH_TOAN_BILL.
+        // get_sql_dieu_chinh_giam sẽ trả chuỗi rỗng.
+        // ==================================================================
+
+        else
+        {
+            return 0L;
+        }
+
+
+        // ------------------------------------------------------------------
+        // 7. TÍNH TỔNG NỢ
+        //
+        // CỰC KỲ QUAN TRỌNG:
+        //
+        // Giữ NGUYÊN công thức VB:
+        //
+        // TONG_TIEN - (TONG_THANH_TOAN_BILL - TONG_TIEN_GIAM_TRU)
+        //
+        // Tức là:
+        //
+        // TONG_TIEN
+        // - TONG_THANH_TOAN_BILL
+        // + TONG_TIEN_GIAM_TRU
+        //
+        // Mặc dù nhìn nghiệp vụ khá lạ nhưng không tự sửa,
+        // để kết quả Entity khớp hệ thống cũ.
+        // ------------------------------------------------------------------
+
+        var tongNo = await query
+            .Select(x =>
+                (decimal?)(
+                    x.TONG_TIEN
+                    -
+                    (
+                        x.TONG_THANH_TOAN_BILL
+                        -
+                        x.TONG_TIEN_GIAM_TRU
+                    )
+                ))
+            .SumAsync(cancellationToken);
+
+
+        return Convert.ToInt64(tongNo ?? 0m);
+    }
     public async Task<ContentResult> P_82_LAY_TT_HOA_DON(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
         var fromDate = DateTime.Today.AddDays(-150);
@@ -395,10 +1293,18 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     public async Task<ContentResult> P_83_LAY_TT_CHI_SO(string? SO_HOA_DON, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
         var rows = await _context.ChiSoDh.AsNoTracking().Where(x => x.SO_HOA_DON == SO_HOA_DON)
-            .Select(x => new { ROOT = "00- OK", CHI_SO_CU = x.CS_DAU, CHI_SO_MOI = x.CS_CUOI, x.SAN_LUONG,
-                LOAI_CHI_SO = x.LOAI_CHI_SO == "0" ? "Định kỳ" : x.LOAI_CHI_SO == "6" ? "Chốt chỉ số" : x.LOAI_CHI_SO })
+            .Select(x => new { x.CS_DAU, x.CS_CUOI, x.SAN_LUONG, x.LOAI_CHI_SO })
             .ToListAsync(cancellationToken);
-        return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } } : rows.Cast<object>());
+        return JsonObject(rows.Count == 0
+            ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } }
+            : rows.Select(x => new
+            {
+                ROOT = "00- OK",
+                CHI_SO_CU = x.CS_DAU,
+                CHI_SO_MOI = x.CS_CUOI,
+                x.SAN_LUONG,
+                LOAI_CHI_SO = x.LOAI_CHI_SO == "0" ? "Định kỳ" : x.LOAI_CHI_SO == "6" ? "Chốt chỉ số" : x.LOAI_CHI_SO
+            }).Cast<object>());
     }
 
     public async Task<ContentResult> P_84_LAY_TT_GIA_NUOC(string? SO_HOA_DON, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
@@ -441,19 +1347,12 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     public async Task<ContentResult> P_88_LAY_TT_CAT_MO_NUOC(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
         var customerCode = (MA_KHACH_HANG ?? string.Empty).PadLeft(9, '0');
-        var rows = await _billing.Aereport.AsNoTracking()
+        var catMoNuocRows = await _billing.Aereport.AsNoTracking()
             .Where(x => x.CUSTID == customerCode)
-            .OrderByDescending(x => x.ERPTID)
             .Select(x => new
             {
-                ROOT = "00- OK",
-                LOAI_HO_SO = x.ERPTTYPE == "0" ? "Thông báo ngừng cấp nước - Nợ tiền nước"
-                    : x.ERPTTYPE == "1" ? "Thông báo ngừng cấp nước - Chi nhánh"
-                    : x.ERPTTYPE == "2" ? "Ngừng cấp nước (Cắt nước)"
-                    : x.ERPTTYPE == "3" ? "Cấp nước lại (Mở nước)"
-                    : x.ERPTTYPE == "4" ? "Giấy mời ký lại hợp đồng tiêu thụ nước sạch"
-                    : x.ERPTTYPE == "5" ? "Điều chỉnh giá tiêu thụ nước sạch" : x.ERPTTYPE,
-                TRANG_THAI = x.ERPTSTS == "1" ? "Đã thực hiện" : x.ERPTSTS == "0" ? "Chưa thực hiện" : x.ERPTSTS,
+                x.ERPTTYPE,
+                x.ERPTSTS,
                 NGAY_THUC_HIEN = x.DATECREATE,
                 NGUOI_THUC_HIEN = x.EXECUTER,
                 LY_DO = x.RPTREASON,
@@ -464,8 +1363,33 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                 TONG_TIEN_NO = x.TOTAL
             })
             .ToListAsync(cancellationToken);
-        return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } } : rows.Cast<object>());
+
+        object[] response = catMoNuocRows.Count == 0
+            ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } }
+            : catMoNuocRows.Select(x => new
+            {
+                ROOT = "00- OK",
+                LOAI_HO_SO = x.ERPTTYPE == "0" ? "Thông báo ngừng cấp nước - Nợ tiền nước"
+                    : x.ERPTTYPE == "1" ? "Thông báo ngừng cấp nước - Chi nhánh"
+                    : x.ERPTTYPE == "2" ? "Ngừng cấp nước (Cắt nước)"
+                    : x.ERPTTYPE == "3" ? "Cấp nước lại (Mở nước)"
+                    : x.ERPTTYPE == "4" ? "Giấy mời ký lại hợp đồng tiêu thụ nước sạch"
+                    : x.ERPTTYPE == "5" ? "Điều chỉnh giá tiêu thụ nước sạch" : x.ERPTTYPE,
+                TRANG_THAI = x.ERPTSTS == "1" ? "Đã thực hiện" : x.ERPTSTS == "0" ? "Chưa thực hiện" : x.ERPTSTS,
+                x.NGAY_THUC_HIEN,
+                x.NGUOI_THUC_HIEN,
+                x.LY_DO,
+                x.CHI_SO_NIEM,
+                x.CHI_SO_NUOC,
+                x.GHI_CHU_1,
+                x.GHI_CHU_2,
+                x.TONG_TIEN_NO
+            }).Cast<object>().ToArray();
+
+        return JsonObject(response);
+
     }
+
 
     public async Task<ContentResult> P_86_LAY_TT_GUI_EMAIL(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
@@ -664,38 +1588,1111 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         return JsonObject(new[] { value ?? new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!", CHI_SO_THAO = (decimal?)null, CHI_SO_LAP = (decimal?)null } });
     }
 
-    public async Task<ContentResult> P_89_TINH_TIEN(string? MA_GIA, string? SAN_LUONG_SD, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    public async Task<ContentResult> P_89_TINH_TIEN(string MA_GIA, string SAN_LUONG_SD, string MA_BIEN_DOC, string SO_IMEI, string PASSWORD_K, CancellationToken cancellationToken)
     {
-        var usage = decimal.TryParse(SAN_LUONG_SD, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0;
-        var price = await _context.KDmGia.AsNoTracking().Where(x => x.MA_GIA == MA_GIA || x.KY_HIEU_GIA == MA_GIA).OrderByDescending(x => x.NGAY_AP_DUNG).FirstOrDefaultAsync(cancellationToken);
-        if (price is null) return JsonObject(new[] { new { ROOT = "16- Không tìm thấy giá.", SAN_LUONG = usage, TONG_TIEN = (decimal?)null } });
-        var unitPrice = price.GIA_CO_BAN ?? price.GIA_GT_01 ?? 0;
-        return JsonObject(new[] { new { ROOT = "00- OK", SAN_LUONG = usage, DON_GIA = unitPrice, THANH_TIEN = usage * unitPrice, THUE = 0m, PHI = 0m, TONG_TIEN = usage * unitPrice } });
+        // ============================================================
+        // HÀM HỖ TRỢ
+        // ============================================================
+
+        static int ParseInt(string? value)
+        {
+            return int.TryParse(
+                value,
+                NumberStyles.Any,
+                CultureInfo.InvariantCulture,
+                out var number)
+                ? number
+                : 0;
+        }
+
+        static decimal ParseMoney(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return 0m;
+
+            var text = value.Trim().Replace(',', '.');
+
+            return decimal.TryParse(
+                text,
+                NumberStyles.Any,
+                CultureInfo.InvariantCulture,
+                out var number)
+                ? number
+                : 0m;
+        }
+
+        // ============================================================
+        // TÍNH THUẾ + PHÍ
+        //
+        // VB cũ:
+        // - SH      => tính phí 100% sản lượng
+        // - Khác SH => tính phí 80% sản lượng
+        //
+        // VAT:
+        //     trả về tỷ lệ, ví dụ 8% => 0.08
+        //
+        // PHÍ:
+        //     KIEU_PHI = "$" => SL * GIA_TRI
+        //     KIEU_PHI = "%" => SL * GIA_TRI / 100
+        // ============================================================
+
+        async Task<(decimal VatRate, long TienPhi)> TienThuePhiAsync(
+            string maGiaCB,
+            int slSD)
+        {
+            if (string.IsNullOrWhiteSpace(maGiaCB))
+                return (0m, 0L);
+
+            maGiaCB = maGiaCB.Trim();
+
+            // --------------------------------------------------------
+            // 1. Lấy loại giá SH / SX / KD / HC...
+            // --------------------------------------------------------
+
+            var loai = await _context.KDmGiaSub
+                .AsNoTracking()
+                .Where(x => x.MA_GIA == maGiaCB)
+                .Select(x => x.LOAI)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            decimal tyLePhi;
+
+            if (loai == "SH")
+            {
+                // Sinh hoạt: 100%
+                tyLePhi = 1m;
+            }
+            else
+            {
+                // Các loại khác: 80%
+                //
+                // VB cũ:
+                // Nếu không tìm thấy K_DM_GIA_SUB thì mặc định 100%.
+                if (loai == null)
+                    tyLePhi = 1m;
+                else
+                    tyLePhi = 0.8m;
+            }
+
+            // VB:
+            // slDaChia = slSD * tylePhi
+            long slDaChia = Convert.ToInt64(slSD * tyLePhi);
+
+            // --------------------------------------------------------
+            // 2. Lấy MA_THUE_VAT + MA_PHI_BVMT của GIÁ CƠ BẢN
+            // --------------------------------------------------------
+
+            var giaCoBan = await _context.KDmGia
+                .AsNoTracking()
+                .Where(x =>
+                    x.HIEU_LUC == "1" &&
+                    x.KIEU_GIA == "0" &&
+                    x.KY_HIEU_GIA == maGiaCB)
+                .Select(x => new
+                {
+                    x.MA_THUE_VAT,
+                    x.MA_PHI_BVMT
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (giaCoBan == null)
+                return (0m, 0L);
+
+            // --------------------------------------------------------
+            // 3. VAT
+            // --------------------------------------------------------
+
+            decimal vatRate = 0m;
+
+            if (!string.IsNullOrWhiteSpace(giaCoBan.MA_THUE_VAT))
+            {
+                var vatGiaTri = await _context.KDmGiaPhi
+                    .AsNoTracking()
+                    .Where(x => x.MA_PHI == giaCoBan.MA_THUE_VAT)
+                    .Select(x => x.GIA_TRI)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                vatRate = Convert.ToDecimal(vatGiaTri) / 100m;
+            }
+
+            // --------------------------------------------------------
+            // 4. PHÍ BVMT / NT
+            // --------------------------------------------------------
+
+            long tienPhi = 0L;
+
+            if (!string.IsNullOrWhiteSpace(giaCoBan.MA_PHI_BVMT))
+            {
+                var phi = await _context.KDmGiaPhi
+                    .AsNoTracking()
+                    .Where(x => x.MA_PHI == giaCoBan.MA_PHI_BVMT)
+                    .Select(x => new
+                    {
+                        x.GIA_TRI,
+                        x.KIEU_PHI
+                    })
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (phi != null)
+                {
+                    decimal giaTri = Convert.ToDecimal(phi.GIA_TRI);
+
+                    if (phi.KIEU_PHI == "$")
+                    {
+                        // VB:
+                        // tienPhi = slDaChia * giatri
+                        tienPhi = Convert.ToInt64(
+                            slDaChia * giaTri);
+                    }
+                    else if (phi.KIEU_PHI == "%")
+                    {
+                        // VB:
+                        // tienPhi = slDaChia * (giatri / 100)
+                        tienPhi = Convert.ToInt64(
+                            slDaChia * (giaTri / 100m));
+                    }
+                }
+            }
+
+            return (vatRate, tienPhi);
+        }
+
+        // ============================================================
+        // GIÁ PHẦN TRĂM
+        //
+        // VB:
+        // tinhBacThangGiaPhanTram
+        //
+        // Return:
+        // ThanhTien
+        // ThueVat
+        // TienPhi
+        // ============================================================
+
+        async Task<(long ThanhTien, long ThueVat, long TienPhi)>
+            TinhBacThangGiaPhanTramAsync(
+                string chuoiGia,
+                string chuoiCongThuc,
+                int slDinhMuc)
+        {
+            long tienNuoc = 0L;
+            long tienVat = 0L;
+            long tienPhi = 0L;
+
+            if (string.IsNullOrWhiteSpace(chuoiGia))
+                return (0L, 0L, 0L);
+
+            if (string.IsNullOrWhiteSpace(chuoiCongThuc))
+                return (0L, 0L, 0L);
+
+            // VB Mid(chuoiGia, 2)
+            var chuoiGiaTemp =
+                chuoiGia.Length > 0
+                    ? chuoiGia[1..]
+                    : string.Empty;
+
+            var chuoiGiaCTTemp =
+                chuoiCongThuc.Length > 0
+                    ? chuoiCongThuc[1..]
+                    : string.Empty;
+
+            var danhSachGia = chuoiGiaTemp.Split(
+                ';',
+                StringSplitOptions.RemoveEmptyEntries |
+                StringSplitOptions.TrimEntries);
+
+            var danhSachCT = chuoiGiaCTTemp.Split(
+                ';',
+                StringSplitOptions.RemoveEmptyEntries |
+                StringSplitOptions.TrimEntries);
+
+            var count = Math.Min(
+                danhSachGia.Length,
+                danhSachCT.Length);
+
+            for (int j = 0; j < count; j++)
+            {
+                var capSLvaGia = danhSachGia[j].Split(
+                    '-',
+                    2,
+                    StringSplitOptions.TrimEntries);
+
+                var capSLvaGiaCT = danhSachCT[j].Split(
+                    '-',
+                    2,
+                    StringSplitOptions.TrimEntries);
+
+                if (capSLvaGia.Length != 2 ||
+                    capSLvaGiaCT.Length != 2)
+                    continue;
+
+                var ptGoc = ParseInt(capSLvaGia[0]);
+
+                var giaGoc = ParseMoney(capSLvaGia[1]);
+
+                // VB:
+                // sl = slDinhMuc * (ptGoc / 100)
+                decimal slDecimal =
+                    slDinhMuc * (ptGoc / 100m);
+
+                var sl = Convert.ToInt32(slDecimal);
+
+                var tienTam = Convert.ToInt64(
+                    slDecimal * giaGoc);
+
+                var maGiaCB =
+                    capSLvaGiaCT[1].Trim();
+
+                var thuePhi = await TienThuePhiAsync(
+                    maGiaCB,
+                    sl);
+
+                var tienVATTam = Convert.ToInt64(
+                    tienTam * thuePhi.VatRate);
+
+                tienNuoc += tienTam;
+                tienVat += tienVATTam;
+                tienPhi += thuePhi.TienPhi;
+            }
+
+            return (
+                tienNuoc,
+                tienVat,
+                tienPhi);
+        }
+
+        // ============================================================
+        // GIÁ GỘP / BẬC THANG $
+        //
+        // VB:
+        // tinhBacThangGiaGop
+        // ============================================================
+
+        async Task<(
+            long ThanhTien,
+            long ThueVat,
+            long TienPhi,
+            int SlConLai)>
+            TinhBacThangGiaGopAsync(
+                string chuoiGia,
+                string chuoiCongThuc,
+                int slDinhMuc,
+                int slConLai)
+        {
+            long tienNuoc = 0L;
+            long tienVat = 0L;
+            long tienPhi = 0L;
+
+            int slChoPhepDung;
+            int slChenhLech;
+
+            if (slDinhMuc < slConLai)
+            {
+                slChoPhepDung = slDinhMuc;
+                slChenhLech = slConLai - slDinhMuc;
+            }
+            else
+            {
+                slChenhLech = 0;
+                slChoPhepDung = slConLai;
+            }
+
+            int slConLaiTam = slChoPhepDung;
+
+            var chuoiGiaTemp =
+                chuoiGia.Length > 0
+                    ? chuoiGia[1..]
+                    : string.Empty;
+
+            var chuoiGiaCTTemp =
+                chuoiCongThuc.Length > 0
+                    ? chuoiCongThuc[1..]
+                    : string.Empty;
+
+            var danhSachGia = chuoiGiaTemp.Split(
+                ';',
+                StringSplitOptions.RemoveEmptyEntries |
+                StringSplitOptions.TrimEntries);
+
+            var danhSachCT = chuoiGiaCTTemp.Split(
+                ';',
+                StringSplitOptions.RemoveEmptyEntries |
+                StringSplitOptions.TrimEntries);
+
+            var count = Math.Min(
+                danhSachGia.Length,
+                danhSachCT.Length);
+
+            for (int j = 0; j < count; j++)
+            {
+                if (slConLaiTam == 0)
+                    break;
+
+                var capSLvaGia = danhSachGia[j].Split(
+                    '-',
+                    2,
+                    StringSplitOptions.TrimEntries);
+
+                var capSLvaGiaCT = danhSachCT[j].Split(
+                    '-',
+                    2,
+                    StringSplitOptions.TrimEntries);
+
+                if (capSLvaGia.Length != 2 ||
+                    capSLvaGiaCT.Length != 2)
+                    continue;
+
+                var slGoc = ParseInt(
+                    capSLvaGia[0]);
+
+                var giaGoc = ParseMoney(
+                    capSLvaGia[1]);
+
+                var maGiaCB =
+                    capSLvaGiaCT[1].Trim();
+
+                int slTinh;
+
+                if (slConLaiTam > slGoc)
+                {
+                    slTinh = slGoc;
+                    slConLaiTam -= slGoc;
+                }
+                else
+                {
+                    slTinh = slConLaiTam;
+                    slConLaiTam = 0;
+                }
+
+                var tienTam = Convert.ToInt64(
+                    slTinh * giaGoc);
+
+                var thuePhi = await TienThuePhiAsync(
+                    maGiaCB,
+                    slTinh);
+
+                var tienVATTam = Convert.ToInt64(
+                    tienTam * thuePhi.VatRate);
+
+                tienNuoc += tienTam;
+                tienVat += tienVATTam;
+                tienPhi += thuePhi.TienPhi;
+            }
+
+            slConLai =
+                slConLaiTam + slChenhLech;
+
+            return (
+                tienNuoc,
+                tienVat,
+                tienPhi,
+                slConLai);
+        }
+
+        // ============================================================
+        // BẮT ĐẦU P_89_TINH_TIEN
+        // ============================================================
+
+        var tongSL = ParseInt(SAN_LUONG_SD);
+
+        if (tongSL < 0)
+            tongSL = 0;
+
+        // ============================================================
+        // Lấy:
+        //
+        // CHUOI_GIA_DM = chuỗi đã thay mã giá thành giá tiền
+        // CHUOI_GIA_GT = chuỗi công thức còn mã M1, M2, A4KDDV...
+        // KIEU_TINH    = $ / %
+        // ============================================================
+
+        var price = await _context.KDmGia
+            .AsNoTracking()
+            .Where(x =>
+                x.HIEU_LUC == "1" &&
+                x.KY_HIEU_GIA == MA_GIA)
+            .Select(x => new
+            {
+                x.CHUOI_GIA_DM,
+                x.CHUOI_GIA_GT,
+                x.KIEU_TINH
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (price == null)
+        {
+            return JsonObject(new[]
+            {
+            new
+            {
+                ROOT = "16- Khong tim thay gia.",
+                THANH_TIEN = (long?)null,
+                THUE_VAT = (long?)null,
+                TIEN_PHI = (long?)null,
+                TONG_TIEN = (long?)null
+            }
+        });
+        }
+
+        var chuoiGiaDm =
+            price.CHUOI_GIA_DM ?? string.Empty;
+
+        var chuoiGiaGt =
+            price.CHUOI_GIA_GT ?? string.Empty;
+
+        var kieuTinh =
+            price.KIEU_TINH ?? string.Empty;
+
+        var thanhPhanGia = chuoiGiaDm.Split(
+            '!',
+            StringSplitOptions.RemoveEmptyEntries |
+            StringSplitOptions.TrimEntries);
+
+        var thanhCongThuc = chuoiGiaGt.Split(
+            '!',
+            StringSplitOptions.RemoveEmptyEntries |
+            StringSplitOptions.TrimEntries);
+
+        if (thanhPhanGia.Length == 0)
+        {
+            return JsonObject(new[]
+            {
+            new
+            {
+                ROOT = "16- Chuoi gia khong hop le.",
+                THANH_TIEN = (long?)null,
+                THUE_VAT = (long?)null,
+                TIEN_PHI = (long?)null,
+                TONG_TIEN = (long?)null
+            }
+        });
+        }
+
+        long thanhTien = 0L;
+        long tienVAT = 0L;
+        long tienPhi = 0L;
+
+        int slConLai = tongSL;
+
+        var soThanhPhan = Math.Min(
+            thanhPhanGia.Length,
+            thanhCongThuc.Length);
+
+        for (int i = 0; i < soThanhPhan; i++)
+        {
+            if (slConLai <= 0)
+                break;
+
+            var chuoiGiaSub =
+                thanhPhanGia[i].Trim();
+
+            var chuoiGiaCTSub =
+                thanhCongThuc[i].Trim();
+
+            if (string.IsNullOrWhiteSpace(chuoiGiaSub))
+                continue;
+
+            var kieuTinhSub =
+                chuoiGiaSub[0];
+
+            var capGiaTriVaGia =
+                chuoiGiaSub.Split(
+                    '(',
+                    2,
+                    StringSplitOptions.TrimEntries);
+
+            var capGiaTriVaGiaCT =
+                chuoiGiaCTSub.Split(
+                    '(',
+                    2,
+                    StringSplitOptions.TrimEntries);
+
+            // ========================================================
+            // CASE 1: KHÔNG CÓ DẤU (
+            // ========================================================
+
+            if (capGiaTriVaGia.Length == 1)
+            {
+                // ----------------------------------------------------
+                // Bắt đầu bằng số
+                // ----------------------------------------------------
+
+                if (char.IsDigit(kieuTinhSub))
+                {
+                    // =================================================
+                    // Kiểu tính $
+                    // =================================================
+
+                    if (kieuTinh == "$")
+                    {
+                        if (chuoiGiaSub.Contains('-'))
+                        {
+                            var capSLvaGia =
+                                chuoiGiaSub.Split(
+                                    '-',
+                                    2,
+                                    StringSplitOptions.TrimEntries);
+
+                            var capSLvaGiaCT =
+                                chuoiGiaCTSub.Split(
+                                    '-',
+                                    2,
+                                    StringSplitOptions.TrimEntries);
+
+                            if (capSLvaGia.Length == 2 &&
+                                capSLvaGiaCT.Length == 2)
+                            {
+                                var slDMGoc =
+                                    ParseInt(capSLvaGia[0]);
+
+                                var giaCBGoc =
+                                    ParseMoney(capSLvaGia[1]);
+
+                                if (slDMGoc > slConLai)
+                                {
+                                    var slTinh =
+                                        slConLai;
+
+                                    var tienTam =
+                                        Convert.ToInt64(
+                                            slTinh * giaCBGoc);
+
+                                    thanhTien += tienTam;
+
+                                    var tp =
+                                        await TienThuePhiAsync(
+                                            capSLvaGiaCT[1],
+                                            slTinh);
+
+                                    tienVAT +=
+                                        Convert.ToInt64(
+                                            tienTam * tp.VatRate);
+
+                                    tienPhi +=
+                                        tp.TienPhi;
+
+                                    slConLai = 0;
+                                }
+                                else
+                                {
+                                    slConLai -= slDMGoc;
+
+                                    var tienTam =
+                                        Convert.ToInt64(
+                                            slDMGoc * giaCBGoc);
+
+                                    thanhTien += tienTam;
+
+                                    // QUAN TRỌNG:
+                                    // Giữ đúng VB cũ:
+                                    //
+                                    // tienThuePhi(
+                                    //     capSLvaGiaCT(1),
+                                    //     slConLai)
+                                    //
+                                    // VB truyền slConLai sau khi đã trừ.
+                                    var tp =
+                                        await TienThuePhiAsync(
+                                            capSLvaGiaCT[1],
+                                            slConLai);
+
+                                    tienVAT +=
+                                        Convert.ToInt64(
+                                            tienTam * tp.VatRate);
+
+                                    tienPhi +=
+                                        tp.TienPhi;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Giá đơn, ví dụ:
+                            // 3809.52
+
+                            var giaCBGoc =
+                                ParseMoney(chuoiGiaSub);
+
+                            thanhTien +=
+                                Convert.ToInt64(
+                                    slConLai * giaCBGoc);
+                        }
+                    }
+
+                    // =================================================
+                    // Kiểu tính %
+                    // =================================================
+
+                    else if (kieuTinh == "%")
+                    {
+                        var giaPT =
+                            "%" + chuoiGiaSub;
+
+                        var ctPT =
+                            "%" + chuoiGiaCTSub;
+
+                        var result =
+                            await TinhBacThangGiaPhanTramAsync(
+                                giaPT,
+                                ctPT,
+                                tongSL);
+
+                        thanhTien += result.ThanhTien;
+                        tienVAT += result.ThueVat;
+                        tienPhi += result.TienPhi;
+                    }
+
+                    // =================================================
+                    // Giá cơ bản
+                    // =================================================
+
+                    else
+                    {
+                        var giaCBGoc =
+                            ParseMoney(chuoiGiaSub);
+
+                        var tienTam =
+                            Convert.ToInt64(
+                                giaCBGoc * tongSL);
+
+                        thanhTien += tienTam;
+
+                        var tp =
+                            await TienThuePhiAsync(
+                                chuoiGiaCTSub,
+                                slConLai);
+
+                        // Giữ logic VB:
+                        // tienVAT += thanhtien * tyleVAT
+                        tienVAT +=
+                            Convert.ToInt64(
+                                thanhTien * tp.VatRate);
+
+                        tienPhi +=
+                            tp.TienPhi;
+                    }
+                }
+
+                // ----------------------------------------------------
+                // Bắt đầu bằng $ hoặc %
+                // ----------------------------------------------------
+
+                else
+                {
+                    var sanLuongDM =
+                        tongSL;
+
+                    if (kieuTinhSub == '$')
+                    {
+                        var result =
+                            await TinhBacThangGiaGopAsync(
+                                chuoiGiaSub,
+                                chuoiGiaCTSub,
+                                sanLuongDM,
+                                slConLai);
+
+                        thanhTien += result.ThanhTien;
+                        tienVAT += result.ThueVat;
+                        tienPhi += result.TienPhi;
+
+                        slConLai =
+                            result.SlConLai;
+                    }
+                    else if (kieuTinhSub == '%')
+                    {
+                        var result =
+                            await TinhBacThangGiaPhanTramAsync(
+                                chuoiGiaSub,
+                                chuoiGiaCTSub,
+                                sanLuongDM);
+
+                        thanhTien += result.ThanhTien;
+                        tienVAT += result.ThueVat;
+                        tienPhi += result.TienPhi;
+                    }
+                }
+            }
+
+            // ========================================================
+            // CASE 2: CÓ GIÁ LỒNG (...)
+            // ========================================================
+
+            else
+            {
+                var giaTriGoc =
+                    capGiaTriVaGia[0];
+
+                var kieuTinhDau =
+                    string.IsNullOrEmpty(giaTriGoc)
+                        ? '\0'
+                        : giaTriGoc[0];
+
+                var chuoiGia =
+                    capGiaTriVaGia[1]
+                        .Replace(")", "")
+                        .Trim();
+
+                var chuoiGiaCT =
+                    capGiaTriVaGiaCT.Length > 1
+                        ? capGiaTriVaGiaCT[1]
+                            .Replace(")", "")
+                            .Trim()
+                        : string.Empty;
+
+                // ====================================================
+                // BẮT ĐẦU BẰNG SỐ
+                // ====================================================
+
+                if (char.IsDigit(kieuTinhDau))
+                {
+                    // ------------------------------------------------
+                    // KIEU_TINH = $
+                    // ------------------------------------------------
+
+                    if (kieuTinh == "$")
+                    {
+                        if (chuoiGiaSub.Contains('-'))
+                        {
+                            giaTriGoc =
+                                giaTriGoc
+                                    .Replace("$", "")
+                                    .Replace("-", "")
+                                    .Trim();
+
+                            var sanLuongDM =
+                                ParseInt(giaTriGoc);
+
+                            var kieuCon =
+                                chuoiGia.Length > 0
+                                    ? chuoiGia[0]
+                                    : '\0';
+
+                            if (kieuCon == '$')
+                            {
+                                var result =
+                                    await TinhBacThangGiaGopAsync(
+                                        chuoiGia,
+                                        chuoiGiaCT,
+                                        sanLuongDM,
+                                        slConLai);
+
+                                thanhTien += result.ThanhTien;
+                                tienVAT += result.ThueVat;
+                                tienPhi += result.TienPhi;
+
+                                slConLai =
+                                    result.SlConLai;
+                            }
+                            else if (kieuCon == '%')
+                            {
+                                var result =
+                                    await TinhBacThangGiaPhanTramAsync(
+                                        chuoiGia,
+                                        chuoiGiaCT,
+                                        slConLai);
+
+                                thanhTien += result.ThanhTien;
+                                tienVAT += result.ThueVat;
+                                tienPhi += result.TienPhi;
+                            }
+                        }
+                        else
+                        {
+                            var giaCBGoc =
+                                ParseMoney(giaTriGoc);
+
+                            thanhTien +=
+                                Convert.ToInt64(
+                                    slConLai * giaCBGoc);
+                        }
+                    }
+
+                    // ------------------------------------------------
+                    // KIEU_TINH = %
+                    // ------------------------------------------------
+
+                    else
+                    {
+                        giaTriGoc =
+                            giaTriGoc
+                                .Replace("%", "")
+                                .Replace("-", "")
+                                .Trim();
+
+                        var sanLuongDM =
+                            ParseInt(giaTriGoc);
+
+                        var kieuCon =
+                            chuoiGia.Length > 0
+                                ? chuoiGia[0]
+                                : '\0';
+
+                        if (kieuCon == '$')
+                        {
+                            sanLuongDM =
+                                (sanLuongDM * slConLai) / 100;
+
+                            var result =
+                                await TinhBacThangGiaGopAsync(
+                                    chuoiGia,
+                                    chuoiGiaCT,
+                                    sanLuongDM,
+                                    slConLai);
+
+                            thanhTien += result.ThanhTien;
+                            tienVAT += result.ThueVat;
+                            tienPhi += result.TienPhi;
+
+                            slConLai =
+                                result.SlConLai;
+                        }
+                        else if (kieuCon == '%')
+                        {
+                            // Giữ đúng VB:
+                            // gọi bằng chuoiGiaSub / chuoiGiaCTSub
+                            var result =
+                                await TinhBacThangGiaPhanTramAsync(
+                                    chuoiGiaSub,
+                                    chuoiGiaCTSub,
+                                    sanLuongDM);
+
+                            thanhTien += result.ThanhTien;
+                            tienVAT += result.ThueVat;
+                            tienPhi += result.TienPhi;
+                        }
+                    }
+                }
+
+                // ====================================================
+                // BẮT ĐẦU BẰNG $ HOẶC %
+                // ====================================================
+
+                else
+                {
+                    // ------------------------------------------------
+                    // $xx-(...)
+                    // ------------------------------------------------
+
+                    if (kieuTinhDau == '$')
+                    {
+                        giaTriGoc =
+                            giaTriGoc
+                                .Replace("$", "")
+                                .Replace("-", "")
+                                .Trim();
+
+                        var sanLuongDM =
+                            ParseInt(giaTriGoc);
+
+                        var kieuCon =
+                            chuoiGia.Length > 0
+                                ? chuoiGia[0]
+                                : '\0';
+
+                        if (kieuCon == '$')
+                        {
+                            var result =
+                                await TinhBacThangGiaGopAsync(
+                                    chuoiGia,
+                                    chuoiGiaCT,
+                                    sanLuongDM,
+                                    slConLai);
+
+                            thanhTien += result.ThanhTien;
+                            tienVAT += result.ThueVat;
+                            tienPhi += result.TienPhi;
+
+                            slConLai =
+                                result.SlConLai;
+                        }
+                        else if (kieuCon == '%')
+                        {
+                            // Giữ đúng VB:
+                            // gọi chuoiGiaSub thay vì chuoiGia
+                            var result =
+                                await TinhBacThangGiaPhanTramAsync(
+                                    chuoiGiaSub,
+                                    chuoiGiaCTSub,
+                                    sanLuongDM);
+
+                            thanhTien += result.ThanhTien;
+                            tienVAT += result.ThueVat;
+                            tienPhi += result.TienPhi;
+                        }
+                    }
+
+                    // ------------------------------------------------
+                    // %xx-(...)
+                    // ------------------------------------------------
+
+                    else
+                    {
+                        giaTriGoc =
+                            giaTriGoc
+                                .Replace("%", "")
+                                .Replace("-", "")
+                                .Trim();
+
+                        var sanLuongDM =
+                            ParseInt(giaTriGoc);
+
+                        var kieuCon =
+                            chuoiGia.Length > 0
+                                ? chuoiGia[0]
+                                : '\0';
+
+                        if (kieuCon == '$')
+                        {
+                            sanLuongDM =
+                                (sanLuongDM * slConLai) / 100;
+
+                            var result =
+                                await TinhBacThangGiaGopAsync(
+                                    chuoiGia,
+                                    chuoiGiaCT,
+                                    sanLuongDM,
+                                    slConLai);
+
+                            thanhTien += result.ThanhTien;
+                            tienVAT += result.ThueVat;
+                            tienPhi += result.TienPhi;
+
+                            slConLai =
+                                result.SlConLai;
+                        }
+                        else if (kieuCon == '%')
+                        {
+                            // Giữ đúng VB cũ
+                            var result =
+                                await TinhBacThangGiaPhanTramAsync(
+                                    chuoiGiaSub,
+                                    chuoiGiaCTSub,
+                                    sanLuongDM);
+
+                            thanhTien += result.ThanhTien;
+                            tienVAT += result.ThueVat;
+                            tienPhi += result.TienPhi;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ============================================================
+        // TỔNG TIỀN
+        // ============================================================
+
+        var tongTien =
+            thanhTien +
+            tienVAT +
+            tienPhi;
+
+        // ============================================================
+        // RESPONSE
+        // ============================================================
+
+        return JsonObject(new[]
+        {
+        new
+        {
+            ROOT = "00- OK",
+            THANH_TIEN = thanhTien,
+            THUE_VAT = tienVAT,
+            TIEN_PHI = tienPhi,
+            TONG_TIEN = tongTien
+        }
+    });
     }
 
     public async Task<ContentResult> P_07_CC_BAO_SU_CO(P_07_CC_BAO_SU_CORequest r, CancellationToken cancellationToken)
     {
-        _context.Cc01TtkhYeuCau.Add(new Cc01TtkhYeuCauEntity
+        var requestId = await NextNumericIdAsync("CC_01_TTKH_YEU_CAU", "ID_YEU_CAU", 9, cancellationToken);
+        var customerRequested = r.KHACH_HANG_YEU_CAU == "Y" ? "Y" : "N";
+        var employeeRequested = r.KHACH_HANG_YEU_CAU == "Y" ? "N" : "Y";
+
+        var affectedRows = await ExecuteNonQueryAsync("""
+            INSERT INTO CC_01_TTKH_YEU_CAU (
+                ID_YEU_CAU,
+                MA_KHACH_HANG,
+                MA_NOI_DUNG_YC,
+                MA_XI_NGHIEP,
+                MA_QUAN,
+                MA_PHUONG,
+                TEN_KHACH_HANG,
+                TEN_KHACH_HANG_SUB,
+                DIA_CHI_DONG_HO,
+                CC_SO_DIEN_THOAI,
+                CC_EMAIL,
+                GHI_CHU,
+                XU_LY_MA_BO_PHAN,
+                XU_LY_MA_TRANG_THAI,
+                CONG_VIEC_24G,
+                KHACH_HANG_YC,
+                NHAN_VIEN_YC,
+                KHACH_HANG_YC_LAN,
+                NHAN_VIEN_YC_LAN,
+                TT_UU_TIEN_CV,
+                NGUOI_CAP_NHAT,
+                NGAY_CAP_NHAT
+            ) VALUES (
+                :id,
+                :customerCode,
+                :requestType,
+                :branch,
+                :district,
+                :ward,
+                :customerName,
+                :customerNameSub,
+                :address,
+                :phone,
+                :email,
+                :note,
+                '02',
+                '01',
+                :work24h,
+                :customerRequested,
+                :employeeRequested,
+                0,
+                1,
+                4,
+                'app_biendoc',
+                SYSDATE
+            )
+            """, new[]
         {
-            ID_YEU_CAU = Guid.NewGuid().ToString("N")[..9],
-            MA_NHAN_VIEN_YC = r.MA_BIEN_DOC, MA_NOI_DUNG_YC = r.LOAI_YEU_CAU,
-            MA_KHACH_HANG = r.MA_KHACH_HANG, MA_XI_NGHIEP = r.MA_XI_NGHIEP,
-            MA_QUAN = r.MA_QUAN, MA_PHUONG = r.MA_PHUONG, TEN_KHACH_HANG = r.TEN_KHACH_HANG,
-            DIA_CHI_DONG_HO = r.DIA_CHI_KHACH_HANG, CC_SO_DIEN_THOAI = r.SO_DIEN_THOAI_KH,
-            CC_EMAIL = r.EMAIL_KH, GHI_CHU = r.NOI_DUNG_YEU_CAU, KHACH_HANG_YC = r.KHACH_HANG_YEU_CAU,
-            CONG_VIEC_24G = r.XU_LY_24H, NGAY_CAP_NHAT = DateTime.Now, NGUOI_CAP_NHAT = r.MA_BIEN_DOC
-        });
-        await _context.SaveChangesAsync(cancellationToken);
-        return JsonObject(new[] { new { ROOT = "00- OK" } });
+            Param("id", requestId),
+            Param("customerCode", r.MA_KHACH_HANG),
+            Param("requestType", r.LOAI_YEU_CAU),
+            Param("branch", r.MA_XI_NGHIEP),
+            Param("district", r.MA_QUAN),
+            Param("ward", r.MA_PHUONG),
+            NParam("customerName", r.TEN_KHACH_HANG),
+            NParam("customerNameSub", $"{r.TEN_KHACH_HANG} [{r.DIA_CHI_KHACH_HANG}]"),
+            NParam("address", r.DIA_CHI_KHACH_HANG),
+            Param("phone", r.SO_DIEN_THOAI_KH),
+            Param("email", string.IsNullOrWhiteSpace(r.EMAIL_KH) ? null : r.EMAIL_KH),
+            NParam("note", r.NOI_DUNG_YEU_CAU),
+            Param("work24h", r.XU_LY_24H),
+            Param("customerRequested", customerRequested),
+            Param("employeeRequested", employeeRequested)
+        }, cancellationToken);
+
+        return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- Dữ liệu không tìm thấy." : "00- OK" } });
     }
 
     public async Task<ContentResult> P_9E_SUA_THONG_TIN_KH(P_9E_SUA_THONG_TIN_KHRequest r, CancellationToken cancellationToken)
     {
         var row = await _context.AppDhChiSo.FirstOrDefaultAsync(x => x.MA_KHACH_HANG == r.MA_KHACH_HANG && x.MA_CHI_NHANH == r.MA_XI_NGHIEP && x.MA_BIEN_DOC == r.MA_BIEN_DOC && x.THANG == r.THANG, cancellationToken);
         if (row is null) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
-        row.SUA_TEN_KHACH_HANG = r.TEN_KHACH_HANG; row.SUA_DIA_CHI_DONG_HO = r.DIA_CHI_DONG_HO;
-        row.SUA_SO_DT = r.SO_DT; row.SUA_EMAIL = r.EMAIL; row.SUA_DH_TEN = r.DONG_HO_TEN;
-        row.SUA_DH_SERIAL = r.DONG_HO_SERIAL; row.SUA_GHI_CHU = r.GHI_CHU;
+        var changed = false;
+        if (!string.IsNullOrWhiteSpace(r.TEN_KHACH_HANG)) { row.SUA_TEN_KHACH_HANG = r.TEN_KHACH_HANG; changed = true; }
+        if (!string.IsNullOrWhiteSpace(r.DIA_CHI_DONG_HO)) { row.SUA_DIA_CHI_DONG_HO = r.DIA_CHI_DONG_HO; changed = true; }
+        if (!string.IsNullOrWhiteSpace(r.SO_DT)) { row.SUA_SO_DT = r.SO_DT; changed = true; }
+        if (!string.IsNullOrWhiteSpace(r.EMAIL)) { row.SUA_EMAIL = r.EMAIL; changed = true; }
+        if (!string.IsNullOrWhiteSpace(r.DONG_HO_TEN)) { row.SUA_DH_TEN = r.DONG_HO_TEN; changed = true; }
+        if (!string.IsNullOrWhiteSpace(r.DONG_HO_SERIAL)) { row.SUA_DH_SERIAL = r.DONG_HO_SERIAL; changed = true; }
+        if (!string.IsNullOrWhiteSpace(r.GHI_CHU)) { row.SUA_GHI_CHU = r.GHI_CHU; changed = true; }
+        if (!changed) return JsonObject(new[] { new { ROOT = "14- Dữ liệu không hợp lệ." } });
         await _context.SaveChangesAsync(cancellationToken);
         return JsonObject(new[] { new { ROOT = "00- OK" } });
     }
@@ -768,3 +2765,12 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     }
 
 }
+
+
+
+
+
+
+
+
+
