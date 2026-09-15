@@ -1552,10 +1552,10 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                 ROOT = "00- OK",
                 MA = x.MaTinhTrangSo,
                 TEN = x.MoTaSub,
-                x.NSuaChiSoCu,
-                x.NNhapChiSoMoi,
-                x.NNhapSlTrucTiep,
-                x.NCongDonChiSo
+                N_SUA_CHI_SO_CU = x.NSuaChiSoCu,
+                N_NHAP_CHI_SO_MOI = x.NNhapChiSoMoi,
+                N_NHAP_SL_TRUC_TIEP = x.NNhapSlTrucTiep,
+                N_CONG_DON_CHI_SO = x.NCongDonChiSo
             })
             .ToListAsync(cancellationToken);
         return JsonObject(rows);
