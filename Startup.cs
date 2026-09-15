@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 using ReadMeter.Api.Businesses;
 using ReadMeter.Api.Configuration;
 using ReadMeter.Api.Data;
+using ReadMeter.Api.OracleModels;
 
 namespace ReadMeter.Api;
 

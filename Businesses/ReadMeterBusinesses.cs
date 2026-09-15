@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Oracle.ManagedDataAccess.Client;
 using ReadMeter.Api.Data;
 using ReadMeter.Api.Models;
+using ReadMeter.Api.OracleModels;
 using ReadMeter.Api.Contracts.Requests;
 using System.Data;
 using System.Data.Common;
@@ -19,6 +20,10 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     private readonly ReadMeterDbContext _context;
     private readonly BillingDbContext _billing;
     private readonly IHttpClientFactory _httpClientFactory;
+    private static readonly JsonSerializerOptions LegacyJsonOptions = new()
+    {
+        PropertyNamingPolicy = new LegacyUpperSnakeCaseNamingPolicy()
+    };
 
     public ReadMeterBusinesses(ReadMeterDbContext context, BillingDbContext billing, IHttpClientFactory httpClientFactory)
     {
@@ -31,8 +36,28 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     {
         StatusCode = StatusCodes.Status200OK,
         ContentType = "application/json; charset=utf-8",
-        Content = JsonSerializer.Serialize(value)
+        Content = JsonSerializer.Serialize(value, LegacyJsonOptions)
     };
+
+    private sealed class LegacyUpperSnakeCaseNamingPolicy : JsonNamingPolicy
+    {
+        public override string ConvertName(string name)
+        {
+            if (name.All(char.IsUpper))
+                return name;
+
+            var result = new StringBuilder(name.Length + 8);
+            for (var index = 0; index < name.Length; index++)
+            {
+                var current = name[index];
+                if (index > 0 && char.IsUpper(current) && char.IsLower(name[index - 1]))
+                    result.Append('_');
+                result.Append(char.ToUpperInvariant(current));
+            }
+
+            return result.ToString();
+        }
+    }
 
     private static string? ExtractMeterReaderCode(string response)
     {
@@ -391,13 +416,13 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     public async Task<ContentResult> P_01_DANG_NHAP(string? USER, string? PASSWORD, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var employee = await _context.DmNhanVien.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.USR == USER, cancellationToken);
+        var employee = await _context.DmNhanViens.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Usr == USER, cancellationToken);
         if (employee is null)
             return JsonObject(new[] { new { ROOT = "11- Tên đăng nhập không đúng." } });
-        if (employee.PAS != PASSWORD)
+        if (employee.Pas != PASSWORD)
             return JsonObject(new[] { new { ROOT = "12- Mật khẩu không đúng." } });
-        return JsonObject(new[] { new { ROOT = "00- OK", MA_BIEN_DOC = employee.MA_NHAN_VIEN, MA_XI_NGHIEP = employee.MA_CHI_NHANH } });
+        return JsonObject(new[] { new { ROOT = "00- OK", MA_BIEN_DOC = employee.MaNhanVien, MA_XI_NGHIEP = employee.MaChiNhanh } });
     }
 
     public async Task<ContentResult> DANGNHAPTHEOMANLD(string? MA_KHACH_HANG, string? PASS, string? SO_DIEN_THOAI, CancellationToken cancellationToken)
@@ -421,12 +446,12 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         if (string.IsNullOrWhiteSpace(meterReader))
             return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
 
-        var employee = await _context.DmNhanVien.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.MA_NHAN_VIEN == meterReader, cancellationToken);
+        var employee = await _context.DmNhanViens.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.MaNhanVien == meterReader, cancellationToken);
         if (employee is null)
             return JsonObject(new[] { new { ROOT = "11- Tên đăng nhập không đúng." } });
 
-        return JsonObject(new[] { new { ROOT = "00- OK", MA_BIEN_DOC = employee.MA_NHAN_VIEN, MA_XI_NGHIEP = employee.MA_CHI_NHANH } });
+        return JsonObject(new[] { new { ROOT = "00- OK", MA_BIEN_DOC = employee.MaNhanVien, MA_XI_NGHIEP = employee.MaChiNhanh } });
     }
 
     public async Task<ContentResult> P_011_DANG_NHAP_DOI_MAT_KHAU(string? MA_BIEN_DOC, string? PASSWORD_OLD, string? PASSWORD_NEW1, string? PASSWORD_NEW2, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
@@ -435,42 +460,42 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
             return JsonObject(new[] { new { ROOT = "14- Dữ liệu không hợp lệ." } });
         if (PASSWORD_NEW1 != PASSWORD_NEW2)
             return JsonObject(new[] { new { ROOT = "15- Mật khẩu mới không khớp. Vui lòng thử lại!" } });
-        var employee = await _context.DmNhanVien
-            .FirstOrDefaultAsync(x => x.MA_NHAN_VIEN == MA_BIEN_DOC && x.PAS == PASSWORD_OLD, cancellationToken);
-        if (employee is null)
+        var affectedRows = await _context.DmNhanViens
+            .Where(x => x.MaNhanVien == MA_BIEN_DOC && x.Pas == PASSWORD_OLD)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Pas, PASSWORD_NEW1), cancellationToken);
+        if (affectedRows == 0)
             return JsonObject(new[] { new { ROOT = "12- Mật khẩu không đúng." } });
-        employee.PAS = PASSWORD_NEW1;
-        await _context.SaveChangesAsync(cancellationToken);
         return JsonObject(new[] { new { ROOT = "00- OK" } });
     }
 
     public async Task<ContentResult> P_012_LAY_GT_CANH_BAO(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var value = await _context.DmNhanVien.AsNoTracking()
-            .Where(x => x.MA_NHAN_VIEN == MA_BIEN_DOC)
-            .Select(x => new { ROOT = "00- OK", x.CANH_BAO_PT, x.CANH_BAO_M3, x.CANH_BAO_GIAM_PT, x.CANH_BAO_GIAM_M3 })
+        var value = await _context.DmNhanViens.AsNoTracking()
+            .Where(x => x.MaNhanVien == MA_BIEN_DOC)
+            .Select(x => new { ROOT = "00- OK", x.CanhBaoPt, x.CanhBaoM3, x.CanhBaoGiamPt, x.CanhBaoGiamM3 })
             .FirstOrDefaultAsync(cancellationToken);
-        return JsonObject(new[] { value ?? new { ROOT = "10- Tài khoản hoặc mật khẩu không đúng.", CANH_BAO_PT = (decimal?)null, CANH_BAO_M3 = (decimal?)null, CANH_BAO_GIAM_PT = (decimal?)null, CANH_BAO_GIAM_M3 = (decimal?)null } });
+        return JsonObject(new[] { value ?? new { ROOT = "10- Tài khoản hoặc mật khẩu không đúng.", CanhBaoPt = (decimal?)null, CanhBaoM3 = (decimal?)null, CanhBaoGiamPt = (decimal?)null, CanhBaoGiamM3 = (decimal?)null } });
     }
 
     public async Task<ContentResult> P_013_LAY_PHIEN_BAN_APP(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var value = await _context.AppDhUpdate.AsNoTracking()
-            .Select(x => new { ROOT = "00- OK", x.BAN_CAP_NHAT, x.DUONG_DAN, x.NGAY_CAP_NHAT })
+        var value = await _context.AppDhUpdates.AsNoTracking()
+            .Select(x => new { ROOT = "00- OK", x.BanCapNhat, x.DuongDan, x.NgayCapNhat })
             .FirstOrDefaultAsync(cancellationToken);
-        return JsonObject(new[] { value ?? new { ROOT = "10- Không có phiên bản cập nhật.", BAN_CAP_NHAT = (string?)null, DUONG_DAN = (string?)null, NGAY_CAP_NHAT = (DateTime?)null } });
+        return JsonObject(new[] { value ?? new { ROOT = "10- Không có phiên bản cập nhật.", BanCapNhat = (string?)null, DuongDan = (string?)null, NgayCapNhat = (DateTime?)null } });
     }
 
     public async Task<ContentResult> P_01_DANG_NHAP_LUU_TOKEN(string? TOKEN, string? VER_CODE, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var employee = await _context.DmNhanVien.FirstOrDefaultAsync(
-            x => x.MA_NHAN_VIEN == MA_BIEN_DOC && x.MA_CHI_NHANH == MA_XI_NGHIEP, cancellationToken);
-        if (employee is null)
+        var affectedRows = await _context.DmNhanViens
+            .Where(x => x.MaNhanVien == MA_BIEN_DOC && x.MaChiNhanh == MA_XI_NGHIEP)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Token, TOKEN)
+                .SetProperty(x => x.VerCode, VER_CODE)
+                .SetProperty(x => x.LogDate, DateTime.Now), cancellationToken);
+        if (affectedRows == 0)
             return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
-        employee.TOKEN = TOKEN;
-        employee.VER_CODE = VER_CODE;
-        employee.LOG_DATE = DateTime.Now;
-        await _context.SaveChangesAsync(cancellationToken);
         return JsonObject(new[] { new { ROOT = "00- OK" } });
     }
 
@@ -485,18 +510,15 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     public async Task<ContentResult> P_022_NHAN_SO_DOC(string? DANH_SACH_MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.AppDhChiSo
-            .Where(x => x.NGAY_EBILL_NHAN_KHOA == null
-                        && x.NGAY_EBILL_NAP_BILL == null
-                        && x.NGAY_BD_NHAN_KHOA == null
-                        && x.MA_BIEN_DOC == MA_BIEN_DOC
-                        && x.THANG == THANG
-                        && x.MA_SO_DOC == DANH_SACH_MA_SO_DOC)
-            .ToListAsync(cancellationToken);
-        var now = DateTime.Now;
-        foreach (var row in rows)
-            row.NGAY_BD_NHAN_KHOA = now;
-        await _context.SaveChangesAsync(cancellationToken);
+        await _context.AppDhChiSos
+            .Where(x => x.NgayEbillNhanKhoa == null
+                        && x.NgayEbillNapBill == null
+                        && x.NgayBdNhanKhoa == null
+                        && x.MaBienDoc == MA_BIEN_DOC
+                        && x.Thang == THANG
+                        && x.MaSoDoc == DANH_SACH_MA_SO_DOC)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.NgayBdNhanKhoa, DateTime.Now), cancellationToken);
         return JsonObject(new[] { new { ROOT = "00- OK" } });
     }
 
@@ -514,33 +536,34 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     public async Task<ContentResult> P_043_LO_TRINH_DI_DOC_MAP(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await (from reading in _context.AppDhChiSo.AsNoTracking()
-            join customer in _context.ThongTinKh.AsNoTracking() on reading.MA_KHACH_HANG equals customer.MA_KHACH_HANG
-            where reading.MA_SO_DOC == MA_SO_DOC && reading.MA_BIEN_DOC == MA_BIEN_DOC && reading.MA_CHI_NHANH == MA_XI_NGHIEP && reading.THANG == THANG
-            orderby reading.STT_SO_DOC_MOI ?? reading.STT_SO_DOC
-            select new { ROOT = "00- OK", ID_DONG_HO = reading.ID_DCS, reading.MA_KHACH_HANG, customer.TEN_KHACH_HANG, customer.DIA_CHI_DONG_HO, customer.PHONE_UT1, reading.VI_TRI_DOC, reading.STT_SO_DOC, reading.STT_SO_DOC_MOI }).ToListAsync(cancellationToken);
+        var rows = await (from reading in _context.AppDhChiSos.AsNoTracking()
+            join customer in _context.ThongTinKhs.AsNoTracking() on reading.MaKhachHang equals customer.MaKhachHang
+            where reading.MaSoDoc == MA_SO_DOC && reading.MaBienDoc == MA_BIEN_DOC && reading.MaChiNhanh == MA_XI_NGHIEP && reading.Thang == THANG
+            orderby reading.SttSoDocMoi ?? reading.SttSoDoc
+            select new { ROOT = "00- OK", ID_DONG_HO = reading.IdDcs, reading.MaKhachHang, customer.TenKhachHang, customer.DiaChiDongHo, customer.PhoneUt1, reading.ViTriDoc, reading.SttSoDoc, reading.SttSoDocMoi }).ToListAsync(cancellationToken);
         return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } } : rows.Cast<object>());
     }
 
     public async Task<ContentResult> P_044_LUU_TEN_FILE_ANH(string? ID_DONG_HO, string? TEN_FILE_ANH, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var row = await _context.AppDhChiSo.FirstOrDefaultAsync(x => x.ID_DCS == ID_DONG_HO, cancellationToken);
-        if (row is null) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
-        row.TEN_FILE_ANH = (TEN_FILE_ANH ?? string.Empty).Replace(".jpg", "", StringComparison.OrdinalIgnoreCase) + ".jpg";
-        await _context.SaveChangesAsync(cancellationToken);
+        var fileName = (TEN_FILE_ANH ?? string.Empty).Replace(".jpg", "", StringComparison.OrdinalIgnoreCase) + ".jpg";
+        var affectedRows = await _context.AppDhChiSos
+            .Where(x => x.IdDcs == ID_DONG_HO)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.TenFileAnh, fileName), cancellationToken);
+        if (affectedRows == 0) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
         return JsonObject(new[] { new { ROOT = "00- OK" } });
     }
 
     public async Task<ContentResult> P_032_LAY_SL_BINH_QUAN_3T(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
         var today = DateTime.Today;
-        var value = await _context.ChiSoDhSub.AsNoTracking()
-            .Where(x => x.MA_KHACH_HANG == MA_KHACH_HANG
-                        && x.NGAY_DINH_KY >= today.AddDays(-360)
-                        && x.NGAY_DINH_KY <= today
-                        && x.SLTB3T > 0)
-            .OrderByDescending(x => x.ID_CS)
-            .Select(x => x.SLTB3T)
+        var value = await _context.ChiSoDhSubs.AsNoTracking()
+            .Where(x => x.MaKhachHang == MA_KHACH_HANG
+                        && x.NgayDinhKy >= today.AddDays(-360)
+                        && x.NgayDinhKy <= today
+                        && x.Sltb3t > 0)
+            .OrderByDescending(x => x.IdCs)
+            .Select(x => x.Sltb3t)
             .FirstOrDefaultAsync(cancellationToken);
         return JsonObject(new[]
         {
@@ -594,19 +617,19 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
             // Any() sẽ dịch thành EXISTS.
             // ============================================================
 
-            var info = await _context.AppDhChiSo
+            var info = await _context.AppDhChiSos
                 .AsNoTracking()
                 .Where(x =>
-                    x.MA_BIEN_DOC == MA_BIEN_DOC &&
-                    x.ID_DCS == ID_DONG_HO)
+                    x.MaBienDoc == MA_BIEN_DOC &&
+                    x.IdDcs == ID_DONG_HO)
                 .Select(x => new
                 {
-                    x.SL_TB_3THANG,
+                    x.SlTb3thang,
 
-                    LA_CO_QUAN = _context.ThongTinKh
+                    LA_CO_QUAN = _context.ThongTinKhs
                         .Any(k =>
-                            k.MA_KHACH_HANG == MA_KHACH_HANG &&
-                            k.LOAI_KHACH_HANG == "N")
+                            k.MaKhachHang == MA_KHACH_HANG &&
+                            k.LoaiKhachHang == "N")
                 })
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -624,7 +647,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                 return TextResult("");
 
             long slTB3T = Convert.ToInt64(
-                info.SL_TB_3THANG ?? 0);
+                info.SlTb3thang ?? 0);
 
             if (slTB3T <= 0)
                 return TextResult("");
@@ -755,10 +778,10 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     {
         if (!decimal.TryParse(STT_MOI, out var newIndex) || newIndex == 0 || STT_MOI == STT_CU)
             return JsonObject(new[] { new { ROOT = "14- Dữ liệu không hợp lệ." } });
-        var row = await _context.AppDhChiSo.FirstOrDefaultAsync(x => x.ID_DCS == ID_DONG_HO && x.MA_KHACH_HANG == MA_KHACH_HANG && x.MA_SO_DOC == MA_SO_DOC && x.THANG == THANG, cancellationToken);
-        if (row is null) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } });
-        row.STT_SO_DOC_MOI = newIndex;
-        await _context.SaveChangesAsync(cancellationToken);
+        var affectedRows = await _context.AppDhChiSos
+            .Where(x => x.IdDcs == ID_DONG_HO && x.MaKhachHang == MA_KHACH_HANG && x.MaSoDoc == MA_SO_DOC && x.Thang == THANG)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.SttSoDocMoi, newIndex), cancellationToken);
+        if (affectedRows == 0) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } });
         return JsonObject(new[] { new { ROOT = "00- OK" } });
     }
 
@@ -767,40 +790,30 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     public async Task<ContentResult> P_051_KIEM_TRA_BAN_GIAO_SD(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var handedOver = await _context.AppDhChiSo.AsNoTracking().AnyAsync(x => x.THANG == THANG && x.MA_CHI_NHANH == MA_XI_NGHIEP && x.MA_BIEN_DOC == MA_BIEN_DOC && x.MA_SO_DOC == MA_SO_DOC && x.NGAY_BIEN_DOC_BG != null, cancellationToken);
+        var handedOver = await _context.AppDhChiSos.AsNoTracking().AnyAsync(x => x.Thang == THANG && x.MaChiNhanh == MA_XI_NGHIEP && x.MaBienDoc == MA_BIEN_DOC && x.MaSoDoc == MA_SO_DOC && x.NgayBienDocBg != null, cancellationToken);
         return JsonObject(new[] { new { ROOT = handedOver ? "01- TRUE" : "00- FALSE" } });
     }
 
     public async Task<ContentResult> P_05_BD_BAN_GIAO_CS_XONG(string? DANH_SACH_MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var readingBooks = (DANH_SACH_MA_SO_DOC ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(x => x.Trim('\'', '"'))
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .ToArray();
-
-        if (readingBooks.Length == 0)
-            return JsonObject(new[] { new { ROOT = "01- Thieu ma so doc!" } });
-
-        var query = _context.AppDhChiSo
+        var query = _context.AppDhChiSos
             .Where(x =>
-                x.NGAY_EBILL_NHAN_KHOA == null &&
-                x.NGAY_EBILL_NAP_BILL == null &&
-                x.NGAY_BD_NHAN_KHOA != null &&
-                x.MA_BIEN_DOC == MA_BIEN_DOC &&
-                x.THANG == THANG &&
-                x.MA_SO_DOC != null &&
-                readingBooks.Contains(x.MA_SO_DOC));
+                x.NgayEbillNhanKhoa == null &&
+                x.NgayEbillNapBill == null &&
+                x.NgayBdNhanKhoa != null &&
+                x.MaBienDoc == MA_BIEN_DOC &&
+                x.Thang == THANG &&
+                x.MaSoDoc == DANH_SACH_MA_SO_DOC);
 
         var hasUnreadMeter = await query
             .AsNoTracking()
-            .AnyAsync(x => x.NGAY_DOC_TUNG_DH == null, cancellationToken);
+            .AnyAsync(x => x.NgayDocTungDh == null, cancellationToken);
 
         if (hasUnreadMeter)
             return JsonObject(new[] { new { ROOT = "18- Chưa đọc xong. Vui lòng kiểm tra lại!" } });
 
         await query.ExecuteUpdateAsync(
-            setters => setters.SetProperty(x => x.NGAY_BIEN_DOC_BG, DateTime.Now),
+            setters => setters.SetProperty(x => x.NgayBienDocBg, DateTime.Now),
             cancellationToken);
 
         return JsonObject(new[] { new { ROOT = "00- OK" } });
@@ -815,29 +828,29 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         var totalWatch = Stopwatch.StartNew();
         var stepWatch = Stopwatch.StartNew();
 
-        var customer = await _context.ThongTinKh
+        var customer = await _context.ThongTinKhs
             .AsNoTracking()
-            .Where(x => x.MA_KHACH_HANG == maKh && x.NGAY_THANH_LY_HD == null)
+            .Where(x => x.MaKhachHang == maKh && x.NgayThanhLyHd == null)
             .Select(x => new
             {
-                x.MA_KHACH_HANG,
-                x.TEN_KHACH_HANG,
-                x.DIA_CHI_KHACH_HANG,
-                DIA_CHI_LAP_DAT = x.DIA_CHI_DONG_HO,
-                DIEN_THOAI = x.PHONE_UT1,
-                EMAIL = x.EMAIL_UT1,
-                x.SO_HOP_DONG,
-                x.SO_HO,
-                x.SO_KHAU,
-                x.DINH_MUC,
-                x.MA_GIA,
-                x.TEN_GIA_NUOC,
-                SERIAL_DH = x.SO_SERIAL_DONG_HO,
-                x.TEN_DONG_HO,
-                x.NGAY_LAP_DAT,
-                x.BIEN_DOC,
-                MUC_DICH_SU_DUNG = x.HT_KD,
-                XN_CAP_NUOC = x.CHI_NHANH
+                x.MaKhachHang,
+                x.TenKhachHang,
+                x.DiaChiKhachHang,
+                DIA_CHI_LAP_DAT = x.DiaChiDongHo,
+                DIEN_THOAI = x.PhoneUt1,
+                EMAIL = x.EmailUt1,
+                x.SoHopDong,
+                x.SoHo,
+                x.SoKhau,
+                x.DinhMuc,
+                x.MaGia,
+                x.TenGiaNuoc,
+                SERIAL_DH = x.SoSerialDongHo,
+                x.TenDongHo,
+                x.NgayLapDat,
+                x.BienDoc,
+                MUC_DICH_SU_DUNG = x.HtKd,
+                XN_CAP_NUOC = x.ChiNhanh
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -850,37 +863,38 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         var debtMs = stepWatch.ElapsedMilliseconds;
 
         stepWatch.Restart();
-        var bq3t = await _context.ChiSoDhSub
+        var bq3t = await _context.ChiSoDhSubs
             .AsNoTracking()
             .Where(x =>
-                x.MA_KHACH_HANG == maKh &&
-                x.SLTB3T > 0)
-            .Select(x => x.SLTB3T)
+                x.MaKhachHang == maKh &&
+                x.Sltb3t > 0)
+            .OrderByDescending(x => x.IdCs)
+            .Select(x => x.Sltb3t)
             .FirstOrDefaultAsync(cancellationToken);
         var averageMs = stepWatch.ElapsedMilliseconds;
 
-        var ngayLapDat = customer.NGAY_LAP_DAT?.ToString("dd/MM/yyyy") ?? string.Empty;
+        var ngayLapDat = customer.NgayLapDat?.ToString("dd/MM/yyyy") ?? string.Empty;
         var result = new[]
         {
             new
             {
                 ROOT = "00- OK",
-                customer.MA_KHACH_HANG,
-                customer.TEN_KHACH_HANG,
-                customer.DIA_CHI_KHACH_HANG,
+                customer.MaKhachHang,
+                customer.TenKhachHang,
+                customer.DiaChiKhachHang,
                 customer.DIA_CHI_LAP_DAT,
                 customer.DIEN_THOAI,
                 customer.EMAIL,
-                customer.SO_HOP_DONG,
-                customer.SO_HO,
-                customer.SO_KHAU,
-                customer.DINH_MUC,
-                customer.MA_GIA,
-                customer.TEN_GIA_NUOC,
+                customer.SoHopDong,
+                customer.SoHo,
+                customer.SoKhau,
+                customer.DinhMuc,
+                customer.MaGia,
+                customer.TenGiaNuoc,
                 customer.SERIAL_DH,
-                customer.TEN_DONG_HO,
+                customer.TenDongHo,
                 NGAY_LAP_DAT = ngayLapDat,
-                customer.BIEN_DOC,
+                customer.BienDoc,
                 customer.MUC_DICH_SU_DUNG,
                 customer.XN_CAP_NUOC,
                 DU_NO = duNo,
@@ -901,19 +915,19 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         CancellationToken cancellationToken = default)
     {
         long tienNo;
-        var dieuChinhGiamDau = await _context.CongNo
+        var dieuChinhGiamDau = await _context.CongNos
             .AsNoTracking()
             .Where(x =>
-                x.MA_KHACH_HANG == maKH &&
-                x.TONG_TIEN < 0 &&
-                x.TRANG_THAI == 1 &&
-                x.MA_DON_VI == 0 &&
-                x.LOAI_HOA_DON == 5)
-            .OrderByDescending(x => x.NGAY_HD_PHAT_HANH)
+                x.MaKhachHang == maKH &&
+                x.TongTien < 0 &&
+                x.TrangThai == 1 &&
+                x.MaDonVi == 0 &&
+                x.LoaiHoaDon == 5)
+            .OrderByDescending(x => x.NgayHdPhatHanh)
             .Select(x => new
             {
-                x.TONG_TIEN,
-                x.SO_HOA_DON_THAY_THE
+                x.TongTien,
+                x.SoHoaDonThayThe
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -921,8 +935,8 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         {
             tienNo = await GetTongTienNoDieuChinhSubAsync(
                 maKH,
-                dieuChinhGiamDau.TONG_TIEN,
-                dieuChinhGiamDau.SO_HOA_DON_THAY_THE,
+                dieuChinhGiamDau.TongTien,
+                dieuChinhGiamDau.SoHoaDonThayThe,
                 cancellationToken);
         }
         else
@@ -942,20 +956,18 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
             //     (TONG_THANH_TOAN_BILL + TONG_TIEN_GIAM_TRU)
             // AND LOAI_HOA_DON <> '5'
 
-            var tongNo = await _context.CongNo
+            var tongNo = await _context.CongNos
                 .AsNoTracking()
                 .Where(x =>
-                    x.MA_KHACH_HANG == maKH &&
-                    x.TRANG_THAI == 1 &&
-                    x.MA_DON_VI == 0 &&
-                    x.LOAI_HOA_DON != 5)
+                    x.MaKhachHang == maKH &&
+                    x.TrangThai == 1 &&
+                    x.MaDonVi == 0 &&
+                    x.LoaiHoaDon != 5)
                 .Select(x => new
                 {
-                    Total = x.TONG_TIEN ?? 0,
-                    Paid = (x.TONG_THANH_TOAN ?? 0) > (x.TONG_THANH_TOAN_BILL ?? 0)
-                        ? (x.TONG_THANH_TOAN ?? 0)
-                        : (x.TONG_THANH_TOAN_BILL ?? 0),
-                    Discount = x.TONG_TIEN_GIAM_TRU ?? 0
+                    Total = x.TongTien ?? 0,
+                    Paid = x.TongThanhToanBill ?? 0,
+                    Discount = x.TongTienGiamTru ?? 0
                 })
                 .Where(x => x.Total > x.Paid + x.Discount)
                 .Select(x => (decimal?)(x.Total - x.Paid - x.Discount))
@@ -979,14 +991,14 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         string custId,
         CancellationToken cancellationToken = default)
     {
-        return await _context.CongNo
+        return await _context.CongNos
             .AsNoTracking()
             .AnyAsync(x =>
-                x.MA_KHACH_HANG == custId &&
-                x.TONG_TIEN < 0 &&
-                x.TRANG_THAI == 1 &&
-                x.MA_DON_VI == 0 &&
-                x.LOAI_HOA_DON == 5,
+                x.MaKhachHang == custId &&
+                x.TongTien < 0 &&
+                x.TrangThai == 1 &&
+                x.MaDonVi == 0 &&
+                x.LoaiHoaDon == 5,
                 cancellationToken);
     }
 
@@ -1013,16 +1025,16 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         if (string.IsNullOrWhiteSpace(shdCanDcGiam))
             return 0L;
 
-        var dsSoHoaDonThayThe = await _context.CongNo
+        var dsSoHoaDonThayThe = await _context.CongNos
             .AsNoTracking()
             .Where(x =>
-                x.MA_KHACH_HANG == custId &&
-                x.TONG_TIEN < 0 &&
-                x.TRANG_THAI == 1 &&
-                x.MA_DON_VI == 0 &&
-                x.LOAI_HOA_DON == 5 &&
-                x.SO_HOA_DON_THAY_THE != null)
-            .Select(x => x.SO_HOA_DON_THAY_THE!)
+                x.MaKhachHang == custId &&
+                x.TongTien < 0 &&
+                x.TrangThai == 1 &&
+                x.MaDonVi == 0 &&
+                x.LoaiHoaDon == 5 &&
+                x.SoHoaDonThayThe != null)
+            .Select(x => x.SoHoaDonThayThe!)
             .Distinct()
             .ToListAsync(cancellationToken);
 // ------------------------------------------------------------------
@@ -1038,14 +1050,14 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         // WHERE SO_HOA_DON = shd_can_dc_giam
         // ------------------------------------------------------------------
 
-        var hoaDonCanDc = await _context.CongNo
+        var hoaDonCanDc = await _context.CongNos
             .AsNoTracking()
-            .Where(x => x.SO_HOA_DON == shdCanDcGiam)
+            .Where(x => x.SoHoaDon == shdCanDcGiam)
             .Select(x => new
             {
-                x.NGAY_HD_PHAT_HANH,
-                x.TONG_THANH_TOAN_BILL,
-                x.TONG_TIEN
+                x.NgayHdPhatHanh,
+                x.TongThanhToanBill,
+                x.TongTien
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -1054,10 +1066,10 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
 
         var tongTienCanDcGiam =
-            Convert.ToDecimal(hoaDonCanDc.TONG_TIEN);
+            Convert.ToDecimal(hoaDonCanDc.TongTien);
 
         var tongTtCanDcGiam =
-            Convert.ToDecimal(hoaDonCanDc.TONG_THANH_TOAN_BILL);
+            Convert.ToDecimal(hoaDonCanDc.TongThanhToanBill);
 
 
         // ------------------------------------------------------------------
@@ -1073,11 +1085,11 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         // Giữ nguyên để giống VB.
         // ------------------------------------------------------------------
 
-        if (hoaDonCanDc.NGAY_HD_PHAT_HANH == null)
+        if (hoaDonCanDc.NgayHdPhatHanh == null)
             return 0L;
 
         var ngayPhatHanh =
-            Convert.ToDateTime(hoaDonCanDc.NGAY_HD_PHAT_HANH);
+            Convert.ToDateTime(hoaDonCanDc.NgayHdPhatHanh);
 
         var tuNgay =
             ngayPhatHanh.Date.AddDays(-300);
@@ -1106,12 +1118,12 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         //
         // ------------------------------------------------------------------
 
-        var query = _context.CongNo
+        var query = _context.CongNos
             .AsNoTracking()
             .Where(x =>
-                x.MA_KHACH_HANG == custId &&
-                x.TRANG_THAI == 1 &&
-                x.MA_DON_VI == 0);
+                x.MaKhachHang == custId &&
+                x.TrangThai == 1 &&
+                x.MaDonVi == 0);
 
 
         // ==================================================================
@@ -1131,16 +1143,16 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
             if (tongTtCanDcGiam >= tongTienDcGiamGoc)
             {
                 query = query.Where(x =>
-                    x.LOAI_HOA_DON == 5 &&
+                    x.LoaiHoaDon == 5 &&
 
-                    x.TONG_TIEN >
+                    x.TongTien >
                         (
-                            x.TONG_THANH_TOAN_BILL +
-                            x.TONG_TIEN_GIAM_TRU
+                            x.TongThanhToanBill +
+                            x.TongTienGiamTru
                         ) &&
 
-                    x.NGAY_HD_PHAT_HANH >= tuNgay &&
-                    x.NGAY_HD_PHAT_HANH <= denNgay);
+                    x.NgayHdPhatHanh >= tuNgay &&
+                    x.NgayHdPhatHanh <= denNgay);
             }
             else
             {
@@ -1173,18 +1185,18 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                 (tongTienDcGiamGoc + tongTtCanDcGiam))
             {
                 query = query.Where(x =>
-                    x.LOAI_HOA_DON != 5 &&
+                    x.LoaiHoaDon != 5 &&
 
-                    x.TONG_TIEN >
+                    x.TongTien >
                         (
-                            x.TONG_THANH_TOAN_BILL +
-                            x.TONG_TIEN_GIAM_TRU
+                            x.TongThanhToanBill +
+                            x.TongTienGiamTru
                         ) &&
 
-                    !dsSoHoaDonThayThe.Contains(x.SO_HOA_DON) &&
+                    !dsSoHoaDonThayThe.Contains(x.SoHoaDon) &&
 
-                    x.NGAY_HD_PHAT_HANH >= tuNgay &&
-                    x.NGAY_HD_PHAT_HANH <= denNgay);
+                    x.NgayHdPhatHanh >= tuNgay &&
+                    x.NgayHdPhatHanh <= denNgay);
             }
 
             // --------------------------------------------------------------
@@ -1199,14 +1211,14 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
             else
             {
                 query = query.Where(x =>
-                    x.TONG_TIEN !=
+                    x.TongTien !=
                         (
-                            x.TONG_THANH_TOAN_BILL +
-                            x.TONG_TIEN_GIAM_TRU
+                            x.TongThanhToanBill +
+                            x.TongTienGiamTru
                         ) &&
 
-                    x.NGAY_HD_PHAT_HANH >= tuNgay &&
-                    x.NGAY_HD_PHAT_HANH <= denNgay);
+                    x.NgayHdPhatHanh >= tuNgay &&
+                    x.NgayHdPhatHanh <= denNgay);
             }
         }
 
@@ -1243,12 +1255,12 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         var tongNo = await query
             .Select(x =>
                 (decimal?)(
-                    x.TONG_TIEN
+                    x.TongTien
                     -
                     (
-                        x.TONG_THANH_TOAN_BILL
+                        x.TongThanhToanBill
                         -
-                        x.TONG_TIEN_GIAM_TRU
+                        x.TongTienGiamTru
                     )
                 ))
             .SumAsync(cancellationToken);
@@ -1260,50 +1272,50 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     {
         var fromDate = DateTime.Today.AddDays(-150);
         var rows = await (
-            from invoice in _context.CongNo.AsNoTracking()
-            join unit in _context.LogBankDonVi.AsNoTracking() on invoice.MA_DON_VI equals unit.MA into units
+            from invoice in _context.CongNos.AsNoTracking()
+            join unit in _context.LogBankDonVis.AsNoTracking() on invoice.MaDonVi equals unit.Ma into units
             from unit in units.DefaultIfEmpty()
-            where invoice.MA_KHACH_HANG == MA_KHACH_HANG && invoice.NGAY_HD_PHAT_HANH >= fromDate
-            orderby invoice.SO_HOA_DON
-            select new { invoice, UNIT_NAME = unit.TEN_SUB })
+            where invoice.MaKhachHang == MA_KHACH_HANG && invoice.NgayHdPhatHanh >= fromDate
+            orderby invoice.SoHoaDon
+            select new { invoice, UNIT_NAME = unit.TenSub })
             .ToListAsync(cancellationToken);
         if (rows.Count == 0)
             return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } });
         return JsonObject(rows.Select(x =>
         {
-            var paid = Math.Max(x.invoice.TONG_THANH_TOAN ?? 0, x.invoice.TONG_THANH_TOAN_BILL ?? 0);
-            var status = x.invoice.TRANG_THAI?.ToString();
+            var paid = Math.Max(x.invoice.TongThanhToan ?? 0, x.invoice.TongThanhToanBill ?? 0);
+            var status = x.invoice.TrangThai?.ToString();
             return new
             {
-                ROOT = "00- OK", x.invoice.SO_HOA_DON, NGAY_PHAT_HANH_HD = x.invoice.NGAY_HD_PHAT_HANH,
-                THANG_HD = x.invoice.THANG, TONG_SAN_LUONG = x.invoice.TONG_SL, x.invoice.TONG_TIEN,
-                NGAY_THANH_TOAN = x.invoice.NGAY_THANH_TOAN ?? x.invoice.NGAY_THANH_TOAN_BILL,
-                TONG_THANH_TOAN = paid, x.invoice.TONG_TIEN_GIAM_TRU,
-                HINH_THUC_TT = status == "2" ? "" : x.invoice.HINH_THUC_TT_BILL switch { "C" => "Tiền mặt", "B" => "Ủy nhiệm thu", "A" => "Chuyển khoản", "S" => "Khấu trừ nội bộ", _ => x.invoice.HINH_THUC_TT_BILL },
-                NOI_THANH_TOAN = x.UNIT_NAME, x.invoice.SERI_HOA_DON,
+                ROOT = "00- OK", x.invoice.SoHoaDon, NGAY_PHAT_HANH_HD = x.invoice.NgayHdPhatHanh,
+                THANG_HD = x.invoice.Thang, TONG_SAN_LUONG = x.invoice.TongSl, x.invoice.TongTien,
+                NGAY_THANH_TOAN = x.invoice.NgayThanhToan ?? x.invoice.NgayThanhToanBill,
+                TONG_THANH_TOAN = paid, x.invoice.TongTienGiamTru,
+                HINH_THUC_TT = status == "2" ? "" : x.invoice.HinhThucTtBill switch { "C" => "Tiền mặt", "B" => "Ủy nhiệm thu", "A" => "Chuyển khoản", "S" => "Khấu trừ nội bộ", _ => x.invoice.HinhThucTtBill },
+                NOI_THANH_TOAN = x.UNIT_NAME, x.invoice.SeriHoaDon,
                 TRANG_THAI_HD = status switch { "0" => "Chưa phát hành", "1" => "Phát hành", "2" or "3" => "Hủy hóa đơn", "4" => "Trả dần", _ => "" },
-                LOAI_HOA_DON = x.invoice.LOAI_HOA_DON?.ToString() switch { "1" => "Định kỳ", "2" => "Tài chính", "3" => "Truy thu", "4" => "Điều chỉnh tăng", "5" => "Điều chỉnh giảm", _ => "" },
-                NGAY_HUY_HD = x.invoice.NGAY_HD_HUY,
-                TINH_TRANG_NO = status == "2" ? "Hủy hóa đơn" : paid == x.invoice.TONG_TIEN ? "Hết nợ" : paid == 0 ? "Đang nợ" : "Thu một phần",
-                GHI_CHU = x.invoice.DIEN_GIAI
+                LOAI_HOA_DON = x.invoice.LoaiHoaDon?.ToString() switch { "1" => "Định kỳ", "2" => "Tài chính", "3" => "Truy thu", "4" => "Điều chỉnh tăng", "5" => "Điều chỉnh giảm", _ => "" },
+                NGAY_HUY_HD = x.invoice.NgayHdHuy,
+                TINH_TRANG_NO = status == "2" ? "Hủy hóa đơn" : paid == x.invoice.TongTien ? "Hết nợ" : paid == 0 ? "Đang nợ" : "Thu một phần",
+                GHI_CHU = x.invoice.DienGiai
             };
         }));
     }
 
     public async Task<ContentResult> P_83_LAY_TT_CHI_SO(string? SO_HOA_DON, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.ChiSoDh.AsNoTracking().Where(x => x.SO_HOA_DON == SO_HOA_DON)
-            .Select(x => new { x.CS_DAU, x.CS_CUOI, x.SAN_LUONG, x.LOAI_CHI_SO })
+        var rows = await _context.ChiSoDhs.AsNoTracking().Where(x => x.SoHoaDon == SO_HOA_DON)
+            .Select(x => new { x.CsDau, x.CsCuoi, x.SanLuong, x.LoaiChiSo })
             .ToListAsync(cancellationToken);
         return JsonObject(rows.Count == 0
             ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } }
             : rows.Select(x => new
             {
                 ROOT = "00- OK",
-                CHI_SO_CU = x.CS_DAU,
-                CHI_SO_MOI = x.CS_CUOI,
-                x.SAN_LUONG,
-                LOAI_CHI_SO = x.LOAI_CHI_SO == "0" ? "Định kỳ" : x.LOAI_CHI_SO == "6" ? "Chốt chỉ số" : x.LOAI_CHI_SO
+                CHI_SO_CU = x.CsDau,
+                CHI_SO_MOI = x.CsCuoi,
+                x.SanLuong,
+                LOAI_CHI_SO = x.LoaiChiSo == "0" ? "Định kỳ" : x.LoaiChiSo == "6" ? "Chốt chỉ số" : x.LoaiChiSo
             }).Cast<object>());
     }
 
@@ -1313,17 +1325,17 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
             return JsonObject(new[] { new { ROOT = $"15- Độ dài dữ liệu không hợp lệ (MKH: {SO_HOA_DON})" } });
 
         var rows = await _context.CongNoGia.AsNoTracking()
-            .Where(x => x.SO_HOA_DON == SO_HOA_DON)
+            .Where(x => x.SoHoaDon == SO_HOA_DON)
             .Select(x => new
             {
                 ROOT = "00- OK",
-                SAN_LUONG = x.TONG_SL,
-                DON_GIA = x.TIEN_GIA_CB,
-                THANH_TIEN = x.THANH_TIEN,
-                PHI = x.THUE_BVMT,
-                THUE = x.VAT,
-                TONG_TIEN = x.TONG_TIEN,
-                TEN_GIA = x.TEN_GIA
+                SAN_LUONG = x.TongSl,
+                DON_GIA = x.TienGiaCb,
+                THANH_TIEN = x.ThanhTien,
+                PHI = x.ThueBvmt,
+                THUE = x.Vat,
+                TONG_TIEN = x.TongTien,
+                TEN_GIA = x.TenGia
             })
             .ToListAsync(cancellationToken);
 
@@ -1336,11 +1348,11 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     {
         var fromDate = DateTime.Today.AddDays(-120);
         var rows = await (from log in _context.LogSms.AsNoTracking()
-            join type in _context.DmLoaiSmsEmail.AsNoTracking() on log.LOAI_SMS equals type.MA_LOAI
-            join status in _context.DmTrangThaiSms.AsNoTracking() on log.KET_QUA equals status.MA_LOAI
-            where log.MA_KHACH_HANG == MA_KHACH_HANG && log.NGAY_GUI >= fromDate
-            orderby log.NGAY_GUI descending
-            select new { ROOT = "00- OK", LOAI_SMS = type.TEN_LOAI, TRANG_THAI = status.TEN_LOAI, log.SO_DIEN_THOAI, log.NGAY_GUI, NOI_DUNG = log.NOI_DUNG_SMS }).ToListAsync(cancellationToken);
+            join type in _context.DmLoaiSmsEmails.AsNoTracking() on log.LoaiSms equals type.MaLoai
+            join status in _context.DmTrangThaiSms.AsNoTracking() on log.KetQua equals status.MaLoai
+            where log.MaKhachHang == MA_KHACH_HANG && log.NgayGui >= fromDate
+            orderby log.NgayGui descending
+            select new { ROOT = "00- OK", LOAI_SMS = type.TenLoai, TRANG_THAI = status.TenLoai, log.SoDienThoai, log.NgayGui, NOI_DUNG = log.NoiDungSms }).ToListAsync(cancellationToken);
         return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } } : rows.Cast<object>());
     }
 
@@ -1400,24 +1412,24 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         var fromDate = today.AddDays(-120);
         var toDate = new DateTime(today.Year, today.Month, 1);
         var rows = await (
-            from log in _context.LogEmail.AsNoTracking()
-            join customer in _context.ThongTinKh.AsNoTracking()
-                on log.MA_KHACH_HANG equals customer.MA_KHACH_HANG
-            join emailType in _context.DmLoaiSmsEmail.AsNoTracking()
-                on log.LOAI_EMAIL equals emailType.MA_LOAI
-            join status in _context.DmTrangThaiEmail.AsNoTracking()
-                on log.KET_QUA equals status.MA_LOAI
-            where log.MA_KHACH_HANG == MA_KHACH_HANG
-                  && log.NGAY_GUI >= fromDate
-                  && log.NGAY_GUI <= toDate
-            orderby log.NGAY_GUI descending
+            from log in _context.LogEmails.AsNoTracking()
+            join customer in _context.ThongTinKhs.AsNoTracking()
+                on log.MaKhachHang equals customer.MaKhachHang
+            join emailType in _context.DmLoaiSmsEmails.AsNoTracking()
+                on log.LoaiEmail equals emailType.MaLoai
+            join status in _context.DmTrangThaiEmails.AsNoTracking()
+                on log.KetQua equals status.MaLoai
+            where log.MaKhachHang == MA_KHACH_HANG
+                  && log.NgayGui >= fromDate
+                  && log.NgayGui <= toDate
+            orderby log.NgayGui descending
             select new
             {
                 ROOT = "00- OK",
-                LOAI_EMAIL = emailType.TEN_LOAI,
-                TRANG_THAI = status.TEN_LOAI,
-                EMAIL = log.EMAIL,
-                NGAY_GUI = log.NGAY_GUI
+                LOAI_EMAIL = emailType.TenLoai,
+                TRANG_THAI = status.TenLoai,
+                EMAIL = log.Email,
+                NGAY_GUI = log.NgayGui
             })
             .ToListAsync(cancellationToken);
 
@@ -1428,74 +1440,74 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     public async Task<ContentResult> P_96_CC_DM_YEU_CAU(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.CcDmNoiDungYc.AsNoTracking()
-            .Where(x => x.APP_DH == "1")
-            .OrderBy(x => x.STT)
-            .Select(x => new { ROOT = "00- OK", MA_LOAI_YEU_CAU = x.ID_NOI_DUNG, TEN_LOAI_YEU_CAU = x.NOI_DUNG_YC })
+        var rows = await _context.CcDmNoiDungYcs.AsNoTracking()
+            .Where(x => x.AppDh == "1")
+            .OrderBy(x => x.Stt)
+            .Select(x => new { ROOT = "00- OK", MA_LOAI_YEU_CAU = x.IdNoiDung, TEN_LOAI_YEU_CAU = x.NoiDungYc })
             .ToListAsync(cancellationToken);
         return JsonObject(rows);
     }
 
     public async Task<ContentResult> P_97_CC_DM_QUAN(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.KDmDiaChinh.AsNoTracking()
-            .Where(x => x.PARENT_MA == "0001")
-            .OrderBy(x => x.MA_DIA_CHINH)
-            .Select(x => new { ROOT = "00- OK", MA_PHUONG = x.MA_DIA_CHINH, TEN_PHUONG = x.TEN_DIA_CHINH })
+        var rows = await _context.KDmDiaChinhs.AsNoTracking()
+            .Where(x => x.ParentMa == "0001")
+            .OrderBy(x => x.MaDiaChinh)
+            .Select(x => new { ROOT = "00- OK", MA_PHUONG = x.MaDiaChinh, TEN_PHUONG = x.TenDiaChinh })
             .ToListAsync(cancellationToken);
         return JsonObject(rows);
     }
 
     public async Task<ContentResult> P_98_CC_DM_PHUONG(string? MA_BIEN_DOC, string? MA_QUAN, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.KDmDiaChinh.AsNoTracking()
-            .Where(x => x.MA_PHUONG == null && x.MA_QUAN == MA_QUAN)
-            .OrderBy(x => x.MA_DIA_CHINH)
-            .Select(x => new { ROOT = "00- OK", MA_PHUONG = x.MA_DIA_CHINH, TEN_PHUONG = x.TEN_DIA_CHINH })
+        var rows = await _context.KDmDiaChinhs.AsNoTracking()
+            .Where(x => x.MaPhuong == null && x.MaQuan == MA_QUAN)
+            .OrderBy(x => x.MaDiaChinh)
+            .Select(x => new { ROOT = "00- OK", MA_PHUONG = x.MaDiaChinh, TEN_PHUONG = x.TenDiaChinh })
             .ToListAsync(cancellationToken);
         return JsonObject(rows);
     }
 
     public async Task<ContentResult> P_91_DM_XI_NGHIEP(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.Dm01DonVi.AsNoTracking()
-            .Where(x => x.KY_HIEU != null && x.KY_HIEU != "0")
-            .OrderBy(x => x.MA_DON_VI)
-            .Select(x => new { ROOT = "00- OK", MA = x.MA_DON_VI, TEN = x.MA_DON_VI + "- " + x.TEN_DON_VI })
+        var rows = await _context.Dm01DonVis.AsNoTracking()
+            .Where(x => x.KyHieu != null && x.KyHieu != "0")
+            .OrderBy(x => x.MaDonVi)
+            .Select(x => new { ROOT = "00- OK", MA = x.MaDonVi, TEN = x.MaDonVi + "- " + x.TenDonVi })
             .ToListAsync(cancellationToken);
         return JsonObject(rows);
     }
 
     public async Task<ContentResult> P_92_DM_BIEN_DOC(string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.DmNhanVien.AsNoTracking()
-            .Where(x => x.DOC_CHI_SO == "1" && x.MA_CHI_NHANH == MA_XI_NGHIEP)
-            .OrderBy(x => x.TEN_NHAN_VIEN)
-            .Select(x => new { ROOT = "00- OK", MA = x.MA_NHAN_VIEN, TEN = x.MA_NHAN_VIEN + "- " + x.TEN_NHAN_VIEN })
+        var rows = await _context.DmNhanViens.AsNoTracking()
+            .Where(x => x.DocChiSo == "1" && x.MaChiNhanh == MA_XI_NGHIEP)
+            .OrderBy(x => x.TenNhanVien)
+            .Select(x => new { ROOT = "00- OK", MA = x.MaNhanVien, TEN = x.MaNhanVien + "- " + x.TenNhanVien })
             .ToListAsync(cancellationToken);
         return JsonObject(rows);
     }
 
     public async Task<ContentResult> P_921_DM_SO_DOC(string? opt_MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var query = _context.DmSoDoc.AsNoTracking()
-            .Where(x => x.MA_CHI_NHANH == MA_XI_NGHIEP && x.HIEU_LUC == "1");
+        var query = _context.DmSoDocs.AsNoTracking()
+            .Where(x => x.MaChiNhanh == MA_XI_NGHIEP && x.HieuLuc == "1");
         if (!string.IsNullOrWhiteSpace(opt_MA_BIEN_DOC))
         {
-            query = query.Where(x => x.MA_BIEN_DOC == opt_MA_BIEN_DOC);
+            query = query.Where(x => x.MaBienDoc == opt_MA_BIEN_DOC);
         }
-        var rows = await query.OrderBy(x => x.MA_SO_DOC)
-            .Select(x => new { ROOT = "00- OK", MA = x.MA_SO_DOC, TEN = x.MA_SO_DOC + "- " + x.TEN_SO_DOC, x.NGAY_DOC })
+        var rows = await query.OrderBy(x => x.MaSoDoc)
+            .Select(x => new { ROOT = "00- OK", MA = x.MaSoDoc, TEN = x.MaSoDoc + "- " + x.TenSoDoc, x.NgayDoc })
             .ToListAsync(cancellationToken);
         return JsonObject(rows.Count == 0 ? new[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } } : rows.Cast<object>());
     }
 
     public async Task<ContentResult> P_99_DM_GHI_CHU(string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.AppDhDmGhiChu.AsNoTracking()
-            .Where(x => x.NHOM == "DCS" || x.NHOM == null)
-            .OrderBy(x => x.STT)
-            .Select(x => new { ROOT = "00- OK", MA = x.MA_GHI_CHU, TEN = x.NOI_DUNG_GHI_CHU })
+        var rows = await _context.AppDhDmGhiChus.AsNoTracking()
+            .Where(x => x.Nhom == "DCS" || x.Nhom == null)
+            .OrderBy(x => x.Stt)
+            .Select(x => new { ROOT = "00- OK", MA = x.MaGhiChu, TEN = x.NoiDungGhiChu })
             .ToListAsync(cancellationToken);
         return JsonObject(rows);
     }
@@ -1504,22 +1516,22 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     {
         decimal? locationCode = decimal.TryParse(MA_DIEM_THU, out var parsedCode) ? parsedCode : null;
         var query =
-            from location in _context.DmDiemThuTien.AsNoTracking()
-            join unit in _context.LogBankDonVi.AsNoTracking()
-                on location.MA_DON_VI_THU equals unit.MA into units
+            from location in _context.DmDiemThuTiens.AsNoTracking()
+            join unit in _context.LogBankDonVis.AsNoTracking()
+                on location.MaDonViThu equals unit.Ma into units
             from unit in units.DefaultIfEmpty()
-            where location.HIEU_LUC == "0"
-                  && location.MA_DON_VI_THU != 29
-                  && (string.IsNullOrEmpty(MA_DIEM_THU) || location.MA_DON_VI_THU == locationCode)
+            where location.HieuLuc == "0"
+                  && location.MaDonViThu != 29
+                  && (string.IsNullOrEmpty(MA_DIEM_THU) || location.MaDonViThu == locationCode)
             select new
             {
                 ROOT = "00- OK",
-                TEN_DON_VI_THU = unit.TEN == null ? null : unit.TEN.Replace("&", " và "),
-                TEN_DIEM_GD = location.TEN_DIEM_GD == null ? null : location.TEN_DIEM_GD.Replace("&", ""),
-                DIA_CHI_GD = location.DIA_CHI_GD == null ? null : location.DIA_CHI_GD.Replace("&", ""),
+                TEN_DON_VI_THU = unit.Ten == null ? null : unit.Ten.Replace("&", " và "),
+                TEN_DIEM_GD = location.TenDiemGd == null ? null : location.TenDiemGd.Replace("&", ""),
+                DIA_CHI_GD = location.DiaChiGd == null ? null : location.DiaChiGd.Replace("&", ""),
                 THOI_GIAN_GD = "_ _:_ _",
-                location.VI_TRI_DIEM_THU,
-                location.DIA_CHI_GOOGLE
+                location.ViTriDiemThu,
+                location.DiaChiGoogle
             };
         var rows = await query.ToListAsync(cancellationToken);
         return JsonObject(rows.Count == 0
@@ -1529,21 +1541,21 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     public async Task<ContentResult> P_93_DM_TINH_TRANG_DH(string? MA_TINH_TRANG_DH, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var query = _context.DmTinhTrangDongHo.AsNoTracking().Where(x => x.HIEU_LUC == "1");
+        var query = _context.DmTinhTrangDongHos.AsNoTracking().Where(x => x.HieuLuc == "1");
         if (!string.IsNullOrWhiteSpace(MA_TINH_TRANG_DH))
         {
-            query = query.Where(x => x.MA_TINH_TRANG_SO == MA_TINH_TRANG_DH);
+            query = query.Where(x => x.MaTinhTrangSo == MA_TINH_TRANG_DH);
         }
-        var rows = await query.OrderBy(x => x.STT_HIEN_THI)
+        var rows = await query.OrderBy(x => x.SttHienThi)
             .Select(x => new
             {
                 ROOT = "00- OK",
-                MA = x.MA_TINH_TRANG_SO,
-                TEN = x.MO_TA_SUB,
-                x.N_SUA_CHI_SO_CU,
-                x.N_NHAP_CHI_SO_MOI,
-                x.N_NHAP_SL_TRUC_TIEP,
-                x.N_CONG_DON_CHI_SO
+                MA = x.MaTinhTrangSo,
+                TEN = x.MoTaSub,
+                x.NSuaChiSoCu,
+                x.NNhapChiSoMoi,
+                x.NNhapSlTrucTiep,
+                x.NCongDonChiSo
             })
             .ToListAsync(cancellationToken);
         return JsonObject(rows);
@@ -1568,24 +1580,24 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     public async Task<ContentResult> PF_01_GetSysDate_Thang(string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var value = await _context.AppDhThangDoc.AsNoTracking()
-            .OrderByDescending(x => x.ID_THANG_DOC)
-            .Select(x => new { x.THANG, x.NAM })
+        var value = await _context.AppDhThangDocs.AsNoTracking()
+            .OrderByDescending(x => x.IdThangDoc)
+            .Select(x => new { x.Thang, x.Nam })
             .FirstOrDefaultAsync(cancellationToken);
         return JsonObject(new[]
         {
-            new { ROOT = value is null ? "16- Dữ liệu không tìm thấy." : "00- OK", THANG_DOC = value is null ? null : $"{value.THANG}/{value.NAM}" }
+            new { ROOT = value is null ? "16- Dữ liệu không tìm thấy." : "00- OK", THANG_DOC = value is null ? null : $"{value.Thang}/{value.Nam}" }
         });
     }
 
     public async Task<ContentResult> PF_02_LAY_CHI_SO_THAO_LAP(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var value = await _context.AppDhThiCong.AsNoTracking()
-            .Where(x => x.MA_KHACH_HANG == MA_KHACH_HANG)
-            .OrderByDescending(x => x.ID_TC)
-            .Select(x => new { ROOT = "00- OK", x.CHI_SO_THAO, x.CHI_SO_LAP })
+        var value = await _context.AppDhThiCongs.AsNoTracking()
+            .Where(x => x.MaKhachHang == MA_KHACH_HANG)
+            .OrderByDescending(x => x.IdTc)
+            .Select(x => new { ROOT = "00- OK", x.ChiSoThao, x.ChiSoLap })
             .FirstOrDefaultAsync(cancellationToken);
-        return JsonObject(new[] { value ?? new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!", CHI_SO_THAO = (decimal?)null, CHI_SO_LAP = (decimal?)null } });
+        return JsonObject(new[] { value ?? new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!", ChiSoThao = (decimal?)null, ChiSoLap = (decimal?)null } });
     }
 
     public async Task<ContentResult> P_89_TINH_TIEN(string MA_GIA, string SAN_LUONG_SD, string MA_BIEN_DOC, string SO_IMEI, string PASSWORD_K, CancellationToken cancellationToken)
@@ -1636,129 +1648,24 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         //     KIEU_PHI = "%" => SL * GIA_TRI / 100
         // ============================================================
 
-        async Task<(decimal VatRate, long TienPhi)> TienThuePhiAsync(
-            string maGiaCB,
-            int slSD)
+        var priceFeeConfigs = new Dictionary<string, (string? Loai, decimal VatRate, decimal PhiGiaTri, string? KieuPhi, bool HasPhi)>(StringComparer.Ordinal);
+
+        (decimal VatRate, long TienPhi) TienThuePhi(string maGiaCB, int slSD)
         {
-            if (string.IsNullOrWhiteSpace(maGiaCB))
+            if (string.IsNullOrWhiteSpace(maGiaCB) || !priceFeeConfigs.TryGetValue(maGiaCB.Trim(), out var config))
                 return (0m, 0L);
 
-            maGiaCB = maGiaCB.Trim();
-
-            // --------------------------------------------------------
-            // 1. Lấy loại giá SH / SX / KD / HC...
-            // --------------------------------------------------------
-
-            var loai = await _context.KDmGiaSub
-                .AsNoTracking()
-                .Where(x => x.MA_GIA == maGiaCB)
-                .Select(x => x.LOAI)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            decimal tyLePhi;
-
-            if (loai == "SH")
-            {
-                // Sinh hoạt: 100%
-                tyLePhi = 1m;
-            }
-            else
-            {
-                // Các loại khác: 80%
-                //
-                // VB cũ:
-                // Nếu không tìm thấy K_DM_GIA_SUB thì mặc định 100%.
-                if (loai == null)
-                    tyLePhi = 1m;
-                else
-                    tyLePhi = 0.8m;
-            }
-
-            // VB:
-            // slDaChia = slSD * tylePhi
-            long slDaChia = Convert.ToInt64(slSD * tyLePhi);
-
-            // --------------------------------------------------------
-            // 2. Lấy MA_THUE_VAT + MA_PHI_BVMT của GIÁ CƠ BẢN
-            // --------------------------------------------------------
-
-            var giaCoBan = await _context.KDmGia
-                .AsNoTracking()
-                .Where(x =>
-                    x.HIEU_LUC == "1" &&
-                    x.KIEU_GIA == "0" &&
-                    x.KY_HIEU_GIA == maGiaCB)
-                .Select(x => new
-                {
-                    x.MA_THUE_VAT,
-                    x.MA_PHI_BVMT
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (giaCoBan == null)
-                return (0m, 0L);
-
-            // --------------------------------------------------------
-            // 3. VAT
-            // --------------------------------------------------------
-
-            decimal vatRate = 0m;
-
-            if (!string.IsNullOrWhiteSpace(giaCoBan.MA_THUE_VAT))
-            {
-                var vatGiaTri = await _context.KDmGiaPhi
-                    .AsNoTracking()
-                    .Where(x => x.MA_PHI == giaCoBan.MA_THUE_VAT)
-                    .Select(x => x.GIA_TRI)
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                vatRate = Convert.ToDecimal(vatGiaTri) / 100m;
-            }
-
-            // --------------------------------------------------------
-            // 4. PHÍ BVMT / NT
-            // --------------------------------------------------------
-
-            long tienPhi = 0L;
-
-            if (!string.IsNullOrWhiteSpace(giaCoBan.MA_PHI_BVMT))
-            {
-                var phi = await _context.KDmGiaPhi
-                    .AsNoTracking()
-                    .Where(x => x.MA_PHI == giaCoBan.MA_PHI_BVMT)
-                    .Select(x => new
-                    {
-                        x.GIA_TRI,
-                        x.KIEU_PHI
-                    })
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                if (phi != null)
-                {
-                    decimal giaTri = Convert.ToDecimal(phi.GIA_TRI);
-
-                    if (phi.KIEU_PHI == "$")
-                    {
-                        // VB:
-                        // tienPhi = slDaChia * giatri
-                        tienPhi = Convert.ToInt64(
-                            slDaChia * giaTri);
-                    }
-                    else if (phi.KIEU_PHI == "%")
-                    {
-                        // VB:
-                        // tienPhi = slDaChia * (giatri / 100)
-                        tienPhi = Convert.ToInt64(
-                            slDaChia * (giaTri / 100m));
-                    }
-                }
-            }
-
-            return (vatRate, tienPhi);
+            var tyLePhi = config.Loai is null or "SH" ? 1m : 0.8m;
+            var slDaChia = Convert.ToInt64(slSD * tyLePhi);
+            var tienPhi = config.HasPhi
+                ? config.KieuPhi == "$" ? Convert.ToInt64(slDaChia * config.PhiGiaTri)
+                : config.KieuPhi == "%" ? Convert.ToInt64(slDaChia * (config.PhiGiaTri / 100m)) : 0L
+                : 0L;
+            return (config.VatRate, tienPhi);
         }
 
         // ============================================================
-        // GIÁ PHẦN TRĂM
+        // // GIÁ PHẦN TRĂM
         //
         // VB:
         // tinhBacThangGiaPhanTram
@@ -1769,7 +1676,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         // TienPhi
         // ============================================================
 
-        async Task<(long ThanhTien, long ThueVat, long TienPhi)>
+        (long ThanhTien, long ThueVat, long TienPhi)
             TinhBacThangGiaPhanTramAsync(
                 string chuoiGia,
                 string chuoiCongThuc,
@@ -1843,7 +1750,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                 var maGiaCB =
                     capSLvaGiaCT[1].Trim();
 
-                var thuePhi = await TienThuePhiAsync(
+                var thuePhi = TienThuePhi(
                     maGiaCB,
                     sl);
 
@@ -1868,11 +1775,11 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         // tinhBacThangGiaGop
         // ============================================================
 
-        async Task<(
+        (
             long ThanhTien,
             long ThueVat,
             long TienPhi,
-            int SlConLai)>
+            int SlConLai)
             TinhBacThangGiaGopAsync(
                 string chuoiGia,
                 string chuoiCongThuc,
@@ -1967,7 +1874,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                 var tienTam = Convert.ToInt64(
                     slTinh * giaGoc);
 
-                var thuePhi = await TienThuePhiAsync(
+                var thuePhi = TienThuePhi(
                     maGiaCB,
                     slTinh);
 
@@ -2009,13 +1916,13 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         var price = await _context.KDmGia
             .AsNoTracking()
             .Where(x =>
-                x.HIEU_LUC == "1" &&
-                x.KY_HIEU_GIA == MA_GIA)
+                x.HieuLuc == "1" &&
+                x.KyHieuGia == MA_GIA)
             .Select(x => new
             {
-                x.CHUOI_GIA_DM,
-                x.CHUOI_GIA_GT,
-                x.KIEU_TINH
+                x.ChuoiGiaDm,
+                x.ChuoiGiaGt,
+                x.KieuTinh
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -2034,14 +1941,40 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         });
         }
 
+        var priceFeeRows = await (
+            from basePrice in _context.KDmGia.AsNoTracking()
+            where basePrice.HieuLuc == "1" && basePrice.KieuGia == "0"
+            join sub in _context.KDmGiaSubs.AsNoTracking() on basePrice.KyHieuGia equals sub.MaGia into subPrices
+            from sub in subPrices.DefaultIfEmpty()
+            join vat in _context.KDmGiaPhis.AsNoTracking() on basePrice.MaThueVat equals vat.MaPhi into vatFees
+            from vat in vatFees.DefaultIfEmpty()
+            join fee in _context.KDmGiaPhis.AsNoTracking() on basePrice.MaPhiBvmt equals fee.MaPhi into environmentFees
+            from fee in environmentFees.DefaultIfEmpty()
+            select new
+            {
+                basePrice.KyHieuGia,
+                Loai = sub == null ? null : sub.Loai,
+                VatRate = vat == null ? 0m : (vat.GiaTri ?? 0m) / 100m,
+                PhiGiaTri = fee == null ? 0m : fee.GiaTri ?? 0m,
+                KieuPhi = fee == null ? null : fee.KieuPhi,
+                HasPhi = fee != null
+            }).ToListAsync(cancellationToken);
+
+        priceFeeConfigs = priceFeeRows
+            .Where(x => !string.IsNullOrWhiteSpace(x.KyHieuGia))
+            .GroupBy(x => x.KyHieuGia!, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => { var item = group.First(); return (item.Loai, item.VatRate, item.PhiGiaTri, item.KieuPhi, item.HasPhi); },
+                StringComparer.Ordinal);
         var chuoiGiaDm =
-            price.CHUOI_GIA_DM ?? string.Empty;
+            price.ChuoiGiaDm ?? string.Empty;
 
         var chuoiGiaGt =
-            price.CHUOI_GIA_GT ?? string.Empty;
+            price.ChuoiGiaGt ?? string.Empty;
 
         var kieuTinh =
-            price.KIEU_TINH ?? string.Empty;
+            price.KieuTinh ?? string.Empty;
 
         var thanhPhanGia = chuoiGiaDm.Split(
             '!',
@@ -2160,7 +2093,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                                     thanhTien += tienTam;
 
                                     var tp =
-                                        await TienThuePhiAsync(
+                                        TienThuePhi(
                                             capSLvaGiaCT[1],
                                             slTinh);
 
@@ -2192,7 +2125,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                                     //
                                     // VB truyền slConLai sau khi đã trừ.
                                     var tp =
-                                        await TienThuePhiAsync(
+                                        TienThuePhi(
                                             capSLvaGiaCT[1],
                                             slConLai);
 
@@ -2232,7 +2165,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                             "%" + chuoiGiaCTSub;
 
                         var result =
-                            await TinhBacThangGiaPhanTramAsync(
+                            TinhBacThangGiaPhanTramAsync(
                                 giaPT,
                                 ctPT,
                                 tongSL);
@@ -2258,7 +2191,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                         thanhTien += tienTam;
 
                         var tp =
-                            await TienThuePhiAsync(
+                            TienThuePhi(
                                 chuoiGiaCTSub,
                                 slConLai);
 
@@ -2285,7 +2218,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                     if (kieuTinhSub == '$')
                     {
                         var result =
-                            await TinhBacThangGiaGopAsync(
+                            TinhBacThangGiaGopAsync(
                                 chuoiGiaSub,
                                 chuoiGiaCTSub,
                                 sanLuongDM,
@@ -2301,7 +2234,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                     else if (kieuTinhSub == '%')
                     {
                         var result =
-                            await TinhBacThangGiaPhanTramAsync(
+                            TinhBacThangGiaPhanTramAsync(
                                 chuoiGiaSub,
                                 chuoiGiaCTSub,
                                 sanLuongDM);
@@ -2370,7 +2303,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                             if (kieuCon == '$')
                             {
                                 var result =
-                                    await TinhBacThangGiaGopAsync(
+                                    TinhBacThangGiaGopAsync(
                                         chuoiGia,
                                         chuoiGiaCT,
                                         sanLuongDM,
@@ -2386,7 +2319,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                             else if (kieuCon == '%')
                             {
                                 var result =
-                                    await TinhBacThangGiaPhanTramAsync(
+                                    TinhBacThangGiaPhanTramAsync(
                                         chuoiGia,
                                         chuoiGiaCT,
                                         slConLai);
@@ -2433,7 +2366,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                                 (sanLuongDM * slConLai) / 100;
 
                             var result =
-                                await TinhBacThangGiaGopAsync(
+                                TinhBacThangGiaGopAsync(
                                     chuoiGia,
                                     chuoiGiaCT,
                                     sanLuongDM,
@@ -2451,7 +2384,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                             // Giữ đúng VB:
                             // gọi bằng chuoiGiaSub / chuoiGiaCTSub
                             var result =
-                                await TinhBacThangGiaPhanTramAsync(
+                                TinhBacThangGiaPhanTramAsync(
                                     chuoiGiaSub,
                                     chuoiGiaCTSub,
                                     sanLuongDM);
@@ -2492,7 +2425,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                         if (kieuCon == '$')
                         {
                             var result =
-                                await TinhBacThangGiaGopAsync(
+                                TinhBacThangGiaGopAsync(
                                     chuoiGia,
                                     chuoiGiaCT,
                                     sanLuongDM,
@@ -2510,7 +2443,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                             // Giữ đúng VB:
                             // gọi chuoiGiaSub thay vì chuoiGia
                             var result =
-                                await TinhBacThangGiaPhanTramAsync(
+                                TinhBacThangGiaPhanTramAsync(
                                     chuoiGiaSub,
                                     chuoiGiaCTSub,
                                     sanLuongDM);
@@ -2547,7 +2480,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                                 (sanLuongDM * slConLai) / 100;
 
                             var result =
-                                await TinhBacThangGiaGopAsync(
+                                TinhBacThangGiaGopAsync(
                                     chuoiGia,
                                     chuoiGiaCT,
                                     sanLuongDM,
@@ -2564,7 +2497,7 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                         {
                             // Giữ đúng VB cũ
                             var result =
-                                await TinhBacThangGiaPhanTramAsync(
+                                TinhBacThangGiaPhanTramAsync(
                                     chuoiGiaSub,
                                     chuoiGiaCTSub,
                                     sanLuongDM);
@@ -2682,86 +2615,111 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     public async Task<ContentResult> P_9E_SUA_THONG_TIN_KH(P_9E_SUA_THONG_TIN_KHRequest r, CancellationToken cancellationToken)
     {
-        var row = await _context.AppDhChiSo.FirstOrDefaultAsync(x => x.MA_KHACH_HANG == r.MA_KHACH_HANG && x.MA_CHI_NHANH == r.MA_XI_NGHIEP && x.MA_BIEN_DOC == r.MA_BIEN_DOC && x.THANG == r.THANG, cancellationToken);
-        if (row is null) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
-        var changed = false;
-        if (!string.IsNullOrWhiteSpace(r.TEN_KHACH_HANG)) { row.SUA_TEN_KHACH_HANG = r.TEN_KHACH_HANG; changed = true; }
-        if (!string.IsNullOrWhiteSpace(r.DIA_CHI_DONG_HO)) { row.SUA_DIA_CHI_DONG_HO = r.DIA_CHI_DONG_HO; changed = true; }
-        if (!string.IsNullOrWhiteSpace(r.SO_DT)) { row.SUA_SO_DT = r.SO_DT; changed = true; }
-        if (!string.IsNullOrWhiteSpace(r.EMAIL)) { row.SUA_EMAIL = r.EMAIL; changed = true; }
-        if (!string.IsNullOrWhiteSpace(r.DONG_HO_TEN)) { row.SUA_DH_TEN = r.DONG_HO_TEN; changed = true; }
-        if (!string.IsNullOrWhiteSpace(r.DONG_HO_SERIAL)) { row.SUA_DH_SERIAL = r.DONG_HO_SERIAL; changed = true; }
-        if (!string.IsNullOrWhiteSpace(r.GHI_CHU)) { row.SUA_GHI_CHU = r.GHI_CHU; changed = true; }
+        var changed = !string.IsNullOrWhiteSpace(r.TEN_KHACH_HANG)
+            || !string.IsNullOrWhiteSpace(r.DIA_CHI_DONG_HO)
+            || !string.IsNullOrWhiteSpace(r.SO_DT)
+            || !string.IsNullOrWhiteSpace(r.EMAIL)
+            || !string.IsNullOrWhiteSpace(r.DONG_HO_TEN)
+            || !string.IsNullOrWhiteSpace(r.DONG_HO_SERIAL)
+            || !string.IsNullOrWhiteSpace(r.GHI_CHU);
         if (!changed) return JsonObject(new[] { new { ROOT = "14- Dữ liệu không hợp lệ." } });
-        await _context.SaveChangesAsync(cancellationToken);
+        var affectedRows = await _context.AppDhChiSos
+            .Where(x => x.MaKhachHang == r.MA_KHACH_HANG && x.MaChiNhanh == r.MA_XI_NGHIEP && x.MaBienDoc == r.MA_BIEN_DOC && x.Thang == r.THANG)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.SuaTenKhachHang, x => string.IsNullOrWhiteSpace(r.TEN_KHACH_HANG) ? x.SuaTenKhachHang : r.TEN_KHACH_HANG)
+                .SetProperty(x => x.SuaDiaChiDongHo, x => string.IsNullOrWhiteSpace(r.DIA_CHI_DONG_HO) ? x.SuaDiaChiDongHo : r.DIA_CHI_DONG_HO)
+                .SetProperty(x => x.SuaSoDt, x => string.IsNullOrWhiteSpace(r.SO_DT) ? x.SuaSoDt : r.SO_DT)
+                .SetProperty(x => x.SuaEmail, x => string.IsNullOrWhiteSpace(r.EMAIL) ? x.SuaEmail : r.EMAIL)
+                .SetProperty(x => x.SuaDhTen, x => string.IsNullOrWhiteSpace(r.DONG_HO_TEN) ? x.SuaDhTen : r.DONG_HO_TEN)
+                .SetProperty(x => x.SuaDhSerial, x => string.IsNullOrWhiteSpace(r.DONG_HO_SERIAL) ? x.SuaDhSerial : r.DONG_HO_SERIAL)
+                .SetProperty(x => x.SuaGhiChu, x => string.IsNullOrWhiteSpace(r.GHI_CHU) ? x.SuaGhiChu : r.GHI_CHU), cancellationToken);
+        if (affectedRows == 0) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
         return JsonObject(new[] { new { ROOT = "00- OK" } });
     }
 
     public async Task<ContentResult> A_011_CHECKIN_DS_KH_CAT_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await (from job in _context.AppCheckInCatNuoc.AsNoTracking()
-            join customer in _context.ThongTinKh.AsNoTracking() on job.MA_KHACH_HANG equals customer.MA_KHACH_HANG
-            where job.MA_NHAN_VIEN == MA_NHAN_VIEN && job.MA_XI_NGHIEP == MA_XI_NGHIEP
-            orderby job.STT
-            select new { ROOT = "00- OK", job.ID_XAC_NHAN, job.MA_KHACH_HANG, customer.TEN_KHACH_HANG, customer.DIA_CHI_DONG_HO, SO_DIEN_THOAI = customer.PHONE_UT1, job.NGAY_XN_BG_NHAN_VIEN, job.NGAY_HOAN_THANH, job.MA_SO_DOC, job.TEN_FILE_ANH, job.GHI_CHU_XN }).ToListAsync(cancellationToken);
+        var rows = await (from job in _context.AppCheckInCatNuocs.AsNoTracking()
+            join customer in _context.ThongTinKhs.AsNoTracking() on job.MaKhachHang equals customer.MaKhachHang
+            where job.MaNhanVien == MA_NHAN_VIEN && job.MaXiNghiep == MA_XI_NGHIEP
+            orderby job.Stt
+            select new { ROOT = "00- OK", job.IdXacNhan, job.MaKhachHang, customer.TenKhachHang, customer.DiaChiDongHo, SO_DIEN_THOAI = customer.PhoneUt1, job.NgayXnBgNhanVien, job.NgayHoanThanh, job.MaSoDoc, job.TenFileAnh, job.GhiChuXn }).ToListAsync(cancellationToken);
         return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } } : rows.Cast<object>());
     }
 
     public async Task<ContentResult> A_012_CHECKIN_DS_KH_MO_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await (from job in _context.AppCheckInMoNuoc.AsNoTracking()
-            join customer in _context.ThongTinKh.AsNoTracking() on job.MA_KHACH_HANG equals customer.MA_KHACH_HANG
-            where job.MA_NHAN_VIEN == MA_NHAN_VIEN && job.MA_XI_NGHIEP == MA_XI_NGHIEP
-            orderby job.ID_XAC_NHAN
-            select new { ROOT = "00- OK", job.ID_XAC_NHAN, job.MA_KHACH_HANG, customer.TEN_KHACH_HANG, customer.DIA_CHI_DONG_HO, SO_DIEN_THOAI = customer.PHONE_UT1, job.NGAY_XN_BG_NHAN_VIEN, job.NGAY_HOAN_THANH, job.MA_SO_DOC, job.TEN_FILE_ANH, job.GHI_CHU_XN }).ToListAsync(cancellationToken);
+        var rows = await (from job in _context.AppCheckInMoNuocs.AsNoTracking()
+            join customer in _context.ThongTinKhs.AsNoTracking() on job.MaKhachHang equals customer.MaKhachHang
+            where job.MaNhanVien == MA_NHAN_VIEN && job.MaXiNghiep == MA_XI_NGHIEP
+            orderby job.IdXacNhan
+            select new { ROOT = "00- OK", job.IdXacNhan, job.MaKhachHang, customer.TenKhachHang, customer.DiaChiDongHo, SO_DIEN_THOAI = customer.PhoneUt1, job.NgayXnBgNhanVien, job.NgayHoanThanh, job.MaSoDoc, job.TenFileAnh, job.GhiChuXn }).ToListAsync(cancellationToken);
         return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } } : rows.Cast<object>());
     }
 
     public async Task<ContentResult> A_013_CHECKIN_DS_KH_GUI_GB(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await (from job in _context.AppCheckInGuiGiay.AsNoTracking()
-            join customer in _context.ThongTinKh.AsNoTracking() on job.MA_KHACH_HANG equals customer.MA_KHACH_HANG
-            where job.MA_NHAN_VIEN == MA_NHAN_VIEN && job.MA_XI_NGHIEP == MA_XI_NGHIEP
-            orderby job.ID_XAC_NHAN
-            select new { ROOT = "00- OK", job.ID_XAC_NHAN, job.MA_KHACH_HANG, customer.TEN_KHACH_HANG, customer.DIA_CHI_DONG_HO, SO_DIEN_THOAI = customer.PHONE_UT1, job.NGAY_XN_BG_NHAN_VIEN, job.NGAY_HOAN_THANH, job.MA_SO_DOC, job.TEN_FILE_ANH, job.GHI_CHU_XN }).ToListAsync(cancellationToken);
+        var rows = await (from job in _context.AppCheckInGuiGiays.AsNoTracking()
+            join customer in _context.ThongTinKhs.AsNoTracking() on job.MaKhachHang equals customer.MaKhachHang
+            where job.MaNhanVien == MA_NHAN_VIEN && job.MaXiNghiep == MA_XI_NGHIEP
+            orderby job.IdXacNhan
+            select new { ROOT = "00- OK", job.IdXacNhan, job.MaKhachHang, customer.TenKhachHang, customer.DiaChiDongHo, SO_DIEN_THOAI = customer.PhoneUt1, job.NgayXnBgNhanVien, job.NgayHoanThanh, job.MaSoDoc, job.TenFileAnh, job.GhiChuXn }).ToListAsync(cancellationToken);
         return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } } : rows.Cast<object>());
     }
 
     public async Task<ContentResult> A_99_CHECKIN_DM_KIEU_CAT(string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await _context.LogBankTienMoNuoc.AsNoTracking()
-            .OrderBy(x => x.KIEU_CAT)
-            .Select(x => new { ROOT = "00- OK", MA = x.KIEU_CAT, TEN = x.KIEU_CAT + "- " + x.GHI_CHU })
+        var rows = await _context.LogBankTienMoNuocs.AsNoTracking()
+            .OrderBy(x => x.KieuCat)
+            .Select(x => new { ROOT = "00- OK", MA = x.KieuCat, TEN = x.KieuCat + "- " + x.GhiChu })
             .ToListAsync(cancellationToken);
         return JsonObject(rows);
     }
 
     public async Task<ContentResult> A_02_CHECKIN_LUU_KH_CAT_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? NGUOI_THI_CONG, string? MA_KIEU_CAT_MO, string? NGAY_HOAN_THANH, string? VI_TRI_XAC_NHAN, string? MA_GHI_CHU, string? GHI_CHU, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var row = await _context.AppCheckInCatNuoc.FirstOrDefaultAsync(x => x.ID_XAC_NHAN == ID_XAC_NHAN && x.MA_NHAN_VIEN == MA_NHAN_VIEN && x.MA_XI_NGHIEP == MA_XI_NGHIEP, cancellationToken);
-        if (row is null) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
-        row.NGUOI_THI_CONG = NGUOI_THI_CONG; row.KIEU_CAT_MO = MA_KIEU_CAT_MO; row.VI_TRI_XAC_NHAN_CU = row.VI_TRI_XAC_NHAN; row.VI_TRI_XAC_NHAN = VI_TRI_XAC_NHAN; row.MA_GHI_CHU = MA_GHI_CHU; row.GHI_CHU_THEM = GHI_CHU; row.LOG_DATE_APP = DateTime.Now;
-        row.NGAY_HOAN_THANH = DateTime.TryParse(NGAY_HOAN_THANH, out var date) ? date : DateTime.Now;
-        await _context.SaveChangesAsync(cancellationToken); return JsonObject(new[] { new { ROOT = "00- OK" } });
+        var completedAt = DateTime.TryParse(NGAY_HOAN_THANH, out var date) ? date : DateTime.Now;
+        var affectedRows = await _context.AppCheckInCatNuocs
+            .Where(x => x.IdXacNhan == ID_XAC_NHAN && x.MaNhanVien == MA_NHAN_VIEN && x.MaXiNghiep == MA_XI_NGHIEP)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.NguoiThiCong, NGUOI_THI_CONG)
+                .SetProperty(x => x.KieuCatMo, MA_KIEU_CAT_MO)
+                .SetProperty(x => x.ViTriXacNhanCu, x => x.ViTriXacNhan)
+                .SetProperty(x => x.ViTriXacNhan, VI_TRI_XAC_NHAN)
+                .SetProperty(x => x.MaGhiChu, MA_GHI_CHU)
+                .SetProperty(x => x.GhiChuThem, GHI_CHU)
+                .SetProperty(x => x.LogDateApp, DateTime.Now)
+                .SetProperty(x => x.NgayHoanThanh, completedAt), cancellationToken);
+        return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- Dữ liệu không tìm thấy." : "00- OK" } });
     }
 
     public async Task<ContentResult> A_03_CHECKIN_LUU_KH_MO_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? NGUOI_THI_CONG, string? MA_KIEU_CAT_MO, string? NGAY_HOAN_THANH, string? VI_TRI_XAC_NHAN, string? MA_GHI_CHU, string? GHI_CHU, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var row = await _context.AppCheckInMoNuoc.FirstOrDefaultAsync(x => x.ID_XAC_NHAN == ID_XAC_NHAN && x.MA_NHAN_VIEN == MA_NHAN_VIEN && x.MA_XI_NGHIEP == MA_XI_NGHIEP, cancellationToken);
-        if (row is null) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
-        row.NGUOI_THI_CONG = NGUOI_THI_CONG; row.KIEU_CAT_MO = MA_KIEU_CAT_MO; row.VI_TRI_XAC_NHAN_CU = row.VI_TRI_XAC_NHAN; row.VI_TRI_XAC_NHAN = VI_TRI_XAC_NHAN; row.MA_GHI_CHU = MA_GHI_CHU; row.GHI_CHU_THEM = GHI_CHU; row.LOG_DATE_APP = DateTime.Now;
-        row.NGAY_HOAN_THANH = DateTime.TryParse(NGAY_HOAN_THANH, out var date) ? date : DateTime.Now;
-        await _context.SaveChangesAsync(cancellationToken); return JsonObject(new[] { new { ROOT = "00- OK" } });
+        var completedAt = DateTime.TryParse(NGAY_HOAN_THANH, out var date) ? date : DateTime.Now;
+        var affectedRows = await _context.AppCheckInMoNuocs
+            .Where(x => x.IdXacNhan == ID_XAC_NHAN && x.MaNhanVien == MA_NHAN_VIEN && x.MaXiNghiep == MA_XI_NGHIEP)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.NguoiThiCong, NGUOI_THI_CONG)
+                .SetProperty(x => x.KieuCatMo, MA_KIEU_CAT_MO)
+                .SetProperty(x => x.ViTriXacNhanCu, x => x.ViTriXacNhan)
+                .SetProperty(x => x.ViTriXacNhan, VI_TRI_XAC_NHAN)
+                .SetProperty(x => x.MaGhiChu, MA_GHI_CHU)
+                .SetProperty(x => x.GhiChuThem, GHI_CHU)
+                .SetProperty(x => x.LogDateApp, DateTime.Now)
+                .SetProperty(x => x.NgayHoanThanh, completedAt), cancellationToken);
+        return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- Dữ liệu không tìm thấy." : "00- OK" } });
     }
 
     public async Task<ContentResult> A_00_CHECKIN_LUU_TEN_FILE_ANH(string? ID_XAC_NHAN, string? LOAI_CV, string? TEN_FILE_ANH, string? MA_NHAN_VIEN, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var changed = false;
-        if (LOAI_CV == "1") { var row = await _context.AppCheckInCatNuoc.FirstOrDefaultAsync(x => x.ID_XAC_NHAN == ID_XAC_NHAN && x.MA_NHAN_VIEN == MA_NHAN_VIEN, cancellationToken); if (row != null) { row.TEN_FILE_ANH = TEN_FILE_ANH; changed = true; } }
-        else if (LOAI_CV == "2") { var row = await _context.AppCheckInMoNuoc.FirstOrDefaultAsync(x => x.ID_XAC_NHAN == ID_XAC_NHAN && x.MA_NHAN_VIEN == MA_NHAN_VIEN, cancellationToken); if (row != null) { row.TEN_FILE_ANH = TEN_FILE_ANH; changed = true; } }
-        else if (LOAI_CV == "3") { var row = await _context.AppCheckInGuiGiay.FirstOrDefaultAsync(x => x.ID_XAC_NHAN == ID_XAC_NHAN && x.MA_NHAN_VIEN == MA_NHAN_VIEN, cancellationToken); if (row != null) { row.TEN_FILE_ANH = TEN_FILE_ANH; changed = true; } }
-        if (!changed) return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
-        await _context.SaveChangesAsync(cancellationToken); return JsonObject(new[] { new { ROOT = "00- OK" } });
+        var affectedRows = LOAI_CV switch
+        {
+            "1" => await _context.AppCheckInCatNuocs.Where(x => x.IdXacNhan == ID_XAC_NHAN && x.MaNhanVien == MA_NHAN_VIEN).ExecuteUpdateAsync(setters => setters.SetProperty(x => x.TenFileAnh, TEN_FILE_ANH), cancellationToken),
+            "2" => await _context.AppCheckInMoNuocs.Where(x => x.IdXacNhan == ID_XAC_NHAN && x.MaNhanVien == MA_NHAN_VIEN).ExecuteUpdateAsync(setters => setters.SetProperty(x => x.TenFileAnh, TEN_FILE_ANH), cancellationToken),
+            "3" => await _context.AppCheckInGuiGiays.Where(x => x.IdXacNhan == ID_XAC_NHAN && x.MaNhanVien == MA_NHAN_VIEN).ExecuteUpdateAsync(setters => setters.SetProperty(x => x.TenFileAnh, TEN_FILE_ANH), cancellationToken),
+            _ => 0
+        };
+        return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- Dữ liệu không tìm thấy." : "00- OK" } });
     }
 
 }
