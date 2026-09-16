@@ -230,17 +230,52 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
 
     }
 
+    private enum CustomerReadingMode
+    {
+        Normal,
+        Sub,
+        SubBs,
+        TraCuu
+    }
+
+    private static string GetCustomerReadingOrderBy(string? sortBy)
+    {
+        if (string.IsNullOrWhiteSpace(sortBy))
+            return "cs.STT_SO_DOC";
+
+        return sortBy.Trim().ToUpperInvariant() switch
+        {
+            "STT_SO_DOC" => "cs.STT_SO_DOC",
+            "STT_SO_DOC_MOI" => "cs.STT_SO_DOC_MOI",
+            "MA_KHACH_HANG" => "cs.MA_KHACH_HANG",
+            "TEN_KHACH_HANG" => "kh.TEN_KHACH_HANG",
+            "DIA_CHI_DONG_HO" => "kh.DIA_CHI_DONG_HO",
+            "NGAY_DOC_DK" => "cs.NGAY_DOC_DK",
+            "NGAY_DOC_CS" => "cs.NGAY_DOC_CS",
+            _ => "cs.STT_SO_DOC"
+        };
+    }
+
     private async Task<ContentResult> GetCustomersForReading(
         string? id, string? sequence, string? customerCode, string? customerName, string? address,
         string? phone, string? bookCode, string? meterReader, string? month, string? filter,
-        bool supplementalOnly, bool assignedBookOnly, CancellationToken cancellationToken)
+        string? sortBy, CustomerReadingMode mode, CancellationToken cancellationToken)
     {
         var where = new StringBuilder();
         var parameters = new List<OracleParameter>();
+
+        var isNormalOrSub = mode is CustomerReadingMode.Normal or CustomerReadingMode.Sub;
+        var isSubBs = mode == CustomerReadingMode.SubBs;
+        var isTraCuu = mode == CustomerReadingMode.TraCuu;
+
+        // Giữ đúng VB cũ cho P_03 / P_03_SUB / P_03_SUB_BS:
+        // nếu có ID thì lọc ID_DCS + MA_SO_DOC, không ép MA_BIEN_DOC/THANG.
         if (!string.IsNullOrWhiteSpace(id))
         {
             where.AppendLine("WHERE cs.ID_DCS = :id");
+            where.AppendLine("  AND cs.MA_SO_DOC = :bookCode");
             parameters.Add(Param("id", id));
+            parameters.Add(Param("bookCode", bookCode));
         }
         else
         {
@@ -253,8 +288,15 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
             parameters.Add(Param("meterReader", meterReader));
             parameters.Add(Param("month", month));
 
-            if (assignedBookOnly)
-                where.AppendLine("  AND cs.NGAY_EBILL_NHAN_KHOA IS NULL AND cs.NGAY_EBILL_NAP_BILL IS NULL AND cs.NGAY_BD_NHAN_KHOA IS NOT NULL");
+            // P_03 và P_03_SUB có 3 điều kiện này trong VB cũ.
+            // P_03_SUB_BS đã comment 3 điều kiện này.
+            // P_0313 giữ nguyên kiểu tra cứu hiện tại: không áp 3 điều kiện khóa.
+            if (isNormalOrSub)
+            {
+                where.AppendLine("  AND cs.NGAY_EBILL_NHAN_KHOA IS NULL");
+                where.AppendLine("  AND cs.NGAY_EBILL_NAP_BILL IS NULL");
+                where.AppendLine("  AND cs.NGAY_BD_NHAN_KHOA IS NOT NULL");
+            }
         }
 
         if (decimal.TryParse(sequence, out var rawSequenceValue))
@@ -262,33 +304,60 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
             where.AppendLine("  AND cs.STT_SO_DOC = :sequence");
             parameters.Add(Param("sequence", rawSequenceValue));
         }
-        if (filter == "1")
-            where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NOT NULL");
-        if (filter == "2")
-            where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NULL");
-        if (supplementalOnly)
+
+        // VB cũ: P_03 và P_03_SUB có KIEU_LOC.
+        // P_03_SUB_BS đã comment toàn bộ KIEU_LOC.
+        if (isNormalOrSub)
+        {
+            if (filter == "1")
+                where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NOT NULL");
+            else if (filter == "2")
+                where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NULL");
+        }
+
+        // P_03_SUB_BS luôn chỉ lấy mã tình trạng BS.
+        if (isSubBs)
             where.AppendLine("  AND cs.MA_TINH_TRANG_DH = 'BS'");
+
+        // VB cũ dùng so sánh chính xác MA_KHACH_HANG, không dùng LIKE.
         if (!string.IsNullOrWhiteSpace(customerCode))
         {
-            where.AppendLine("  AND kh.MA_KHACH_HANG LIKE :customerCode");
-            parameters.Add(Param("customerCode", $"%{customerCode}%"));
+            where.AppendLine("  AND cs.MA_KHACH_HANG = :customerCode");
+            parameters.Add(Param("customerCode", customerCode));
         }
+
         if (!string.IsNullOrWhiteSpace(customerName))
         {
             where.AppendLine("  AND UPPER(kh.TEN_KHACH_HANG) LIKE UPPER(:customerName)");
             parameters.Add(NParam("customerName", $"%{customerName}%"));
         }
+
         if (!string.IsNullOrWhiteSpace(address))
         {
             where.AppendLine("  AND UPPER(kh.DIA_CHI_DONG_HO) LIKE UPPER(:address)");
             parameters.Add(NParam("address", $"%{address}%"));
         }
+
         if (!string.IsNullOrWhiteSpace(phone))
         {
             where.AppendLine("  AND kh.PHONE_UT1 LIKE :phone");
             parameters.Add(Param("phone", $"%{phone}%"));
         }
 
+        // Ba hàm P_03 cũ dùng RIGHT OUTER JOIN từ THONG_TIN_KH sang APP_DH_CHI_SO,
+        // tương đương APP_DH_CHI_SO LEFT JOIN THONG_TIN_KH.
+        // Riêng P_0313 chưa có source VB trong phần đối chiếu nên giữ JOIN hiện tại.
+        var joinClause = isTraCuu
+            ? "JOIN THONG_TIN_KH kh ON kh.MA_KHACH_HANG = cs.MA_KHACH_HANG"
+            : "LEFT JOIN THONG_TIN_KH kh ON kh.MA_KHACH_HANG = cs.MA_KHACH_HANG";
+
+        // Ba hàm P_03 cũ dùng SAP_XEP_THEO, mặc định STT_SO_DOC.
+        // P_0313 giữ nguyên thứ tự hiện tại vì chưa có hàm VB gốc để đối chiếu.
+        var orderBy = isTraCuu
+            ? "NVL(cs.STT_SO_DOC_MOI, cs.STT_SO_DOC)"
+            : GetCustomerReadingOrderBy(sortBy);
+
+        // PHẦN SELECT/RESPONSE GIỮ NGUYÊN như file hiện tại để không thay đổi dữ liệu trả client.
         var rows = await QueryRowsAsync($"""
             SELECT
                 '00- OK' ROOT,
@@ -326,10 +395,10 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                 cs.TEN_FILE_ANH,
                 cs.SL_TB_3THANG
             FROM APP_DH_CHI_SO cs
-            JOIN THONG_TIN_KH kh ON kh.MA_KHACH_HANG = cs.MA_KHACH_HANG
+            {joinClause}
             {where}
               AND kh.NGAY_THANH_LY_HD IS NULL
-            ORDER BY NVL(cs.STT_SO_DOC_MOI, cs.STT_SO_DOC)
+            ORDER BY {orderBy}
             """, parameters, cancellationToken);
 
         return JsonObject(rows.Count == 0
@@ -523,25 +592,127 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     }
 
     public Task<ContentResult> P_03_LAY_DS_KHACH_HANG(string? ID_DOC_opt, string? STT_SO_DOC_opt, string? MA_KH_opt, string? TEN_KH_opt, string? DIA_CHI_DH_opt, string? PHONE_KH_opt, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? KIEU_LOC, string? SAP_XEP_THEO, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, false, true, cancellationToken);
+        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, SAP_XEP_THEO, CustomerReadingMode.Normal, cancellationToken);
 
     public Task<ContentResult> P_03_LAY_DS_KHACH_HANG_SUB(string? ID_DOC_opt, string? STT_SO_DOC_opt, string? MA_KH_opt, string? TEN_KH_opt, string? DIA_CHI_DH_opt, string? PHONE_KH_opt, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? KIEU_LOC, string? SAP_XEP_THEO, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, false, true, cancellationToken);
+        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, SAP_XEP_THEO, CustomerReadingMode.Sub, cancellationToken);
 
     public Task<ContentResult> P_03_LAY_DS_KHACH_HANG_SUB_BS(string? ID_DOC_opt, string? STT_SO_DOC_opt, string? MA_KH_opt, string? TEN_KH_opt, string? DIA_CHI_DH_opt, string? PHONE_KH_opt, string? MA_SO_DOC, string? MA_BIEN_DOC, string? THANG, string? KIEU_LOC, string? SAP_XEP_THEO, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, true, true, cancellationToken);
+        GetCustomersForReading(ID_DOC_opt, STT_SO_DOC_opt, MA_KH_opt, TEN_KH_opt, DIA_CHI_DH_opt, PHONE_KH_opt, MA_SO_DOC, MA_BIEN_DOC, THANG, KIEU_LOC, SAP_XEP_THEO, CustomerReadingMode.SubBs, cancellationToken);
 
     public Task<ContentResult> P_0313_LAY_DS_KHACH_HANG_TRA_CUU(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        GetCustomersForReading(null, null, null, null, null, null, MA_SO_DOC, MA_BIEN_DOC, THANG, "0", false, false, cancellationToken);
+        GetCustomersForReading(null, null, null, null, null, null, MA_SO_DOC, MA_BIEN_DOC, THANG, "0", null, CustomerReadingMode.TraCuu, cancellationToken);
 
-    public async Task<ContentResult> P_043_LO_TRINH_DI_DOC_MAP(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    public async Task<ContentResult> P_043_LO_TRINH_DI_DOC_MAP(
+    string? MA_SO_DOC,
+    string? MA_BIEN_DOC,
+    string? MA_XI_NGHIEP,
+    string? THANG,
+    string? SO_IMEI,
+    string? PASSWORD_K,
+    CancellationToken cancellationToken)
     {
-        var rows = await (from reading in _context.AppDhChiSos.AsNoTracking()
-            join customer in _context.ThongTinKhs.AsNoTracking() on reading.MaKhachHang equals customer.MaKhachHang
-            where reading.MaSoDoc == MA_SO_DOC && reading.MaBienDoc == MA_BIEN_DOC && reading.MaChiNhanh == MA_XI_NGHIEP && reading.Thang == THANG
-            orderby reading.SttSoDocMoi ?? reading.SttSoDoc
-            select new { ROOT = "00- OK", ID_DONG_HO = reading.IdDcs, reading.MaKhachHang, customer.TenKhachHang, customer.DiaChiDongHo, customer.PhoneUt1, reading.ViTriDoc, reading.SttSoDoc, reading.SttSoDocMoi }).ToListAsync(cancellationToken);
-        return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } } : rows.Cast<object>());
+        // MA_XI_NGHIEP, SO_IMEI, PASSWORD_K:
+        // vẫn giữ parameter để tương thích API cũ,
+        // nhưng REST mới không dùng để kiểm tra.
+
+        var data = await (
+            from reading in _context.AppDhChiSos.AsNoTracking()
+
+            join customerTemp in _context.ThongTinKhs.AsNoTracking()
+                on reading.MaKhachHang equals customerTemp.MaKhachHang
+                into customers
+
+            from customer in customers.DefaultIfEmpty()
+
+            where
+                reading.MaBienDoc == MA_BIEN_DOC &&
+                reading.MaSoDoc == MA_SO_DOC &&
+                reading.Thang == THANG &&
+
+                // VB:
+                // THONG_TIN_KH.NGAY_THANH_LY_HD IS NULL
+                customer.NgayThanhLyHd == null
+
+            // VB:
+            // ORDER BY NGAY_GHI_THUC_TE
+            // = APP_DH_CHI_SO.NGAY_DOC_TUNG_DH
+            orderby reading.NgayDocTungDh
+
+            select new
+            {
+                reading.IdDcs,
+
+                // Lấy đúng từ THONG_TIN_KH như VB
+                MA_KHACH_HANG = customer.MaKhachHang,
+
+                TEN_KHACH_HANG = customer.TenKhachHang,
+
+                DIA_CHI_DONG_HO = customer.DiaChiDongHo,
+
+                NGAY_GHI_THUC_TE = reading.NgayDocTungDh,
+
+                reading.TongSl,
+                reading.ChiSoMoi,
+                reading.ViTriDoc,
+                reading.ViTriDocCu
+            })
+            .ToListAsync(cancellationToken);
+
+
+        if (data.Count == 0)
+        {
+            return JsonObject(new object[]
+            {
+            new
+            {
+                ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!"
+            }
+            });
+        }
+
+
+        var rows = data
+            .Select(x => new
+            {
+                ROOT = "00- OK",
+
+                ID_DOC = x.IdDcs,
+
+                MA_KHACH_HANG = x.MA_KHACH_HANG,
+
+                TEN_KHACH_HANG = x.TEN_KHACH_HANG,
+
+                DIA_CHI_DONG_HO = x.DIA_CHI_DONG_HO,
+
+                TINH_TRANG_CS =
+                    x.NGAY_GHI_THUC_TE.HasValue
+                        ? "Đã ghi"
+                        : "Chưa ghi",
+
+                TONG_SL =
+                    x.TongSl == null
+                        ? 0
+                        : Convert.ToInt32(x.TongSl),
+
+                CHI_SO_MOI = x.ChiSoMoi,
+
+                VI_TRI_DOC = x.ViTriDoc,
+
+                VI_TRI_DOC_CU = x.ViTriDocCu,
+
+                NGAY_DOC_THUC_TE =
+                    x.NGAY_GHI_THUC_TE.HasValue
+                        ? x.NGAY_GHI_THUC_TE.Value.ToString(
+                            "dd/MM/yyyy HH:mm:ss",
+                            CultureInfo.InvariantCulture)
+                        : string.Empty
+            })
+            .Cast<object>()
+            .ToArray();
+
+
+        return JsonObject(rows);
     }
 
     public async Task<ContentResult> P_044_LUU_TEN_FILE_ANH(string? ID_DONG_HO, string? TEN_FILE_ANH, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
@@ -906,16 +1077,49 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         return JsonObject(result);
     }
 
-    // ======================================================================
-    // GET TỔNG DƯ NỢ THEO MÃ KHÁCH HÀNG
-    // Convert từ: get_Tong_Du_No_Theo_maKH_V2
-    // ======================================================================
-    private async Task<string> GetTongDuNoTheoMaKhV2Async(
+
+
+
+    // ============================================================================
+    // TÍNH TỔNG TIỀN NỢ TRONG TRƯỜNG HỢP CÓ HÓA ĐƠN ĐIỀU CHỈNH GIẢM
+    //
+    // VB gốc:
+    // Private Function get_tong_tien_no_dieu_chinh_sub(
+    //     ByVal CUST_ID As String) As Long
+    //
+    // LƯU Ý QUAN TRỌNG:
+    //
+    // VB gốc dùng:
+    //
+    // TONG_TIEN - (TONG_THANH_TOAN_BILL - TONG_TIEN_GIAM_TRU)
+    //
+    // tương đương:
+    //
+    // TONG_TIEN - TONG_THANH_TOAN_BILL + TONG_TIEN_GIAM_TRU
+    //
+    // Giữ nguyên logic cũ.
+    // ============================================================================
+
+    private async Task<long> GetTongTienNoDieuChinhSubAsync(
         string maKH,
         CancellationToken cancellationToken = default)
     {
-        long tienNo;
-        var dieuChinhGiamDau = await _context.CongNos
+        // ========================================================================
+        // 1. LẤY TẤT CẢ HÓA ĐƠN ĐIỀU CHỈNH GIẢM
+        //
+        // VB:
+        //
+        // SELECT TONG_TIEN, SO_HOA_DON_THAY_THE
+        // FROM CONG_NO
+        // WHERE MA_KHACH_HANG = CUST_ID
+        // AND TONG_TIEN < 0
+        // AND TRANG_THAI = 1
+        // AND MA_DON_VI = 0
+        // AND LOAI_HOA_DON = 5
+        // ORDER BY NGAY_HD_PHAT_HANH DESC
+        // ========================================================================
+
+        var dsDieuChinhGiam = await _context.CongNos
             .AsNoTracking()
             .Where(x =>
                 x.MaKhachHang == maKH &&
@@ -929,57 +1133,534 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
                 x.TongTien,
                 x.SoHoaDonThayThe
             })
+            .ToListAsync(cancellationToken);
+
+
+        // Không có điều chỉnh giảm
+        if (dsDieuChinhGiam.Count == 0)
+            return 0;
+
+
+        // ========================================================================
+        // 2. VB lấy dòng đầu tiên sau ORDER BY NGAY_HD_PHAT_HANH DESC
+        //
+        // shd_can_dc_giam = SO_HOA_DON_THAY_THE
+        // tong_tien_dc_GIAM_GOC = Abs(TONG_TIEN)
+        // ========================================================================
+
+        var dieuChinhGiamDau = dsDieuChinhGiam[0];
+
+        var shdCanDcGiam =
+            dieuChinhGiamDau.SoHoaDonThayThe ?? string.Empty;
+
+        var tongTienDcGiamGoc =
+            Math.Abs(dieuChinhGiamDau.TongTien ?? 0m);
+
+
+        if (string.IsNullOrWhiteSpace(shdCanDcGiam))
+            return 0;
+
+
+        // ========================================================================
+        // 3. TẠO DANH SÁCH TẤT CẢ SO_HOA_DON_THAY_THE
+        //
+        // VB tạo:
+        //
+        // 'HD1', 'HD2', 'HD3'
+        //
+        // để dùng:
+        //
+        // SO_HOA_DON NOT IN (...)
+        // ========================================================================
+
+        var dsSoHoaDonThayThe = dsDieuChinhGiam
+            .Where(x =>
+                !string.IsNullOrWhiteSpace(x.SoHoaDonThayThe))
+            .Select(x =>
+                x.SoHoaDonThayThe!)
+            .ToList();
+
+
+        // ========================================================================
+        // 4. LẤY HÓA ĐƠN GỐC CẦN ĐIỀU CHỈNH
+        //
+        // VB:
+        //
+        // SELECT
+        //     NGAY_HD_PHAT_HANH,
+        //     TONG_THANH_TOAN_BILL,
+        //     TONG_TIEN
+        //
+        // FROM CONG_NO
+        //
+        // WHERE SO_HOA_DON = shd_can_dc_giam
+        // ========================================================================
+
+        var hoaDonGoc = await _context.CongNos
+            .AsNoTracking()
+            .Where(x =>
+                x.SoHoaDon == shdCanDcGiam)
+            .Select(x => new
+            {
+                x.NgayHdPhatHanh,
+                x.TongTien,
+                x.TongThanhToanBill
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (dieuChinhGiamDau is not null)
-        {
-            tienNo = await GetTongTienNoDieuChinhSubAsync(
-                maKH,
-                dieuChinhGiamDau.TongTien,
-                dieuChinhGiamDau.SoHoaDonThayThe,
-                cancellationToken);
-        }
-        else
+
+        if (hoaDonGoc == null)
+            return 0;
+
+
+        // VB:
+        //
+        // tong_tien_can_dc_giam
+        // tong_tt_can_dc_giam
+
+        var tongTienCanDcGiam =
+            hoaDonGoc.TongTien ?? 0m;
+
+        var tongTtCanDcGiam =
+            hoaDonGoc.TongThanhToanBill ?? 0m;
+
+
+        // ========================================================================
+        // 5. NGÀY HÓA ĐƠN GỐC LÙI 300 NGÀY
+        //
+        // VB:
+        //
+        // ngayPHHD_can_dc_giam =
+        // DateAdd("d", -300, NGAY_HD_PHAT_HANH)
+        //
+        // Sau đó:
+        //
+        // BETWEEN ngày_lùi_300 AND Now.Date
+        // ========================================================================
+
+        if (!hoaDonGoc.NgayHdPhatHanh.HasValue)
+            return 0;
+
+
+        var tuNgay = hoaDonGoc.NgayHdPhatHanh
+            .Value
+            .Date
+            .AddDays(-300);
+
+
+        var denNgay = DateTime.Today;
+
+
+        // ========================================================================
+        // 6. SQL_MAIN GỐC
+        //
+        // SELECT
+        //
+        // (
+        //     TONG_TIEN -
+        //     (
+        //         TONG_THANH_TOAN_BILL -
+        //         TONG_TIEN_GIAM_TRU
+        //     )
+        // ) AS tien
+        //
+        // FROM CONG_NO
+        //
+        // WHERE MA_KHACH_HANG = CUST_ID
+        // AND TRANG_THAI = 1
+        // AND MA_DON_VI = 0
+        // ========================================================================
+
+        var query = _context.CongNos
+            .AsNoTracking()
+            .Where(x =>
+                x.MaKhachHang == maKH &&
+                x.TrangThai == 1 &&
+                x.MaDonVi == 0);
+
+
+        // ========================================================================
+        // CASE 1:
+        //
+        // HÓA ĐƠN GỐC ĐÃ THANH TOÁN HẾT
+        //
+        // VB:
+        //
+        // If tong_tien_can_dc_giam = tong_tt_can_dc_giam Then
+        // ========================================================================
+
+        if (tongTienCanDcGiam == tongTtCanDcGiam)
         {
             // VB:
             //
-            // SELECT SUM(
-            //      TONG_TIEN
-            //      - TONG_THANH_TOAN_BILL
-            //      - TONG_TIEN_GIAM_TRU
-            // )
-            // FROM CONG_NO
-            // WHERE MA_KHACH_HANG = maKH
-            // AND TRANG_THAI = 1
-            // AND MA_DON_VI = 0
-            // AND TONG_TIEN >
-            //     (TONG_THANH_TOAN_BILL + TONG_TIEN_GIAM_TRU)
-            // AND LOAI_HOA_DON <> '5'
+            // If tong_tt_can_dc_giam >= tong_tien_dc_GIAM_GOC Then
+            //
+            // Nếu không thỏa thì Sql vẫn rỗng
+            // => get_tong_tien_no_dieu_chinh_sub trả 0
 
-            var tongNo = await _context.CongNos
-                .AsNoTracking()
-                .Where(x =>
-                    x.MaKhachHang == maKH &&
-                    x.TrangThai == 1 &&
-                    x.MaDonVi == 0 &&
-                    x.LoaiHoaDon != 5)
-                .Select(x => new
-                {
-                    Total = x.TongTien ?? 0,
-                    Paid = x.TongThanhToanBill ?? 0,
-                    Discount = x.TongTienGiamTru ?? 0
-                })
-                .Where(x => x.Total > x.Paid + x.Discount)
-                .Select(x => (decimal?)(x.Total - x.Paid - x.Discount))
-                .SumAsync(cancellationToken);
+            if (tongTtCanDcGiam < tongTienDcGiamGoc)
+                return 0;
 
-            tienNo = Convert.ToInt64(tongNo ?? 0m);
+
+            query = query.Where(x =>
+
+                // AND LOAI_HOA_DON <> 5
+                x.LoaiHoaDon != 5 &&
+
+
+                // Giữ semantics Oracle:
+                // nếu một trong các trường NULL
+                // thì biểu thức so sánh không thỏa
+
+                x.TongTien.HasValue &&
+                x.TongThanhToanBill.HasValue &&
+                x.TongTienGiamTru.HasValue &&
+
+
+                // AND TONG_TIEN >
+                // (
+                //     TONG_THANH_TOAN_BILL +
+                //     TONG_TIEN_GIAM_TRU
+                // )
+
+                x.TongTien.Value >
+                    x.TongThanhToanBill.Value +
+                    x.TongTienGiamTru.Value &&
+
+
+                // AND NGAY_HD_PHAT_HANH BETWEEN ...
+
+                x.NgayHdPhatHanh.HasValue &&
+                x.NgayHdPhatHanh.Value >= tuNgay &&
+                x.NgayHdPhatHanh.Value <= denNgay
+            );
         }
 
-        if (tienNo <= 0)
+
+        // ========================================================================
+        // CASE 2:
+        //
+        // HÓA ĐƠN GỐC CHƯA THANH TOÁN
+        // HOẶC CHỈ THANH TOÁN MỘT PHẦN
+        //
+        // VB:
+        //
+        // ElseIf tong_tien_can_dc_giam > tong_tt_can_dc_giam Then
+        // ========================================================================
+
+        else if (tongTienCanDcGiam > tongTtCanDcGiam)
+        {
+            // ====================================================================
+            // CASE 2.1
+            //
+            // TONG_TIEN_GỐC
+            // =
+            // TIỀN ĐIỀU CHỈNH GIẢM
+            // +
+            // TIỀN ĐÃ THANH TOÁN
+            //
+            // VB:
+            //
+            // If tong_tien_can_dc_giam =
+            //    (tong_tien_dc_GIAM_GOC + tong_tt_can_dc_giam)
+            // ====================================================================
+
+            if (tongTienCanDcGiam ==
+                tongTienDcGiamGoc + tongTtCanDcGiam)
+            {
+                query = query.Where(x =>
+
+                    // AND LOAI_HOA_DON <> 5
+
+                    x.LoaiHoaDon != 5 &&
+
+
+                    x.TongTien.HasValue &&
+                    x.TongThanhToanBill.HasValue &&
+                    x.TongTienGiamTru.HasValue &&
+
+
+                    // AND TONG_TIEN >
+                    // (
+                    //     TONG_THANH_TOAN_BILL +
+                    //     TONG_TIEN_GIAM_TRU
+                    // )
+
+                    x.TongTien.Value >
+                        x.TongThanhToanBill.Value +
+                        x.TongTienGiamTru.Value &&
+
+
+                    // VB:
+                    //
+                    // AND SO_HOA_DON NOT IN (...)
+                    //
+                    // Dùng danh sách toàn bộ
+                    // SO_HOA_DON_THAY_THE
+
+                    !dsSoHoaDonThayThe.Contains(
+                        x.SoHoaDon ?? string.Empty) &&
+
+
+                    // khoảng ngày
+
+                    x.NgayHdPhatHanh.HasValue &&
+                    x.NgayHdPhatHanh.Value >= tuNgay &&
+                    x.NgayHdPhatHanh.Value <= denNgay
+                );
+            }
+
+
+            // ====================================================================
+            // CASE 2.2
+            //
+            // Chưa hết nợ sau điều chỉnh
+            //
+            // VB:
+            //
+            // AND TONG_TIEN <>
+            // (
+            //     TONG_THANH_TOAN_BILL +
+            //     TONG_TIEN_GIAM_TRU
+            // )
+            //
+            // QUAN TRỌNG:
+            //
+            // Nhánh VB này KHÔNG có:
+            //
+            // LOAI_HOA_DON <> 5
+            //
+            // nên C# cũng không thêm.
+            // ====================================================================
+
+            else
+            {
+                query = query.Where(x =>
+
+                    x.TongTien.HasValue &&
+                    x.TongThanhToanBill.HasValue &&
+                    x.TongTienGiamTru.HasValue &&
+
+
+                    x.TongTien.Value !=
+                        x.TongThanhToanBill.Value +
+                        x.TongTienGiamTru.Value &&
+
+
+                    x.NgayHdPhatHanh.HasValue &&
+                    x.NgayHdPhatHanh.Value >= tuNgay &&
+                    x.NgayHdPhatHanh.Value <= denNgay
+                );
+            }
+        }
+
+
+        // ========================================================================
+        // Nếu:
+        //
+        // tongTienCanDcGiam < tongTtCanDcGiam
+        //
+        // VB không thêm điều kiện vào Sql.
+        //
+        // Sql = ""
+        //
+        // => hàm Sub không query
+        // => trả 0
+        // ========================================================================
+
+        else
+        {
+            return 0;
+        }
+
+
+        // ========================================================================
+        // 7. TÍNH TỔNG NỢ
+        //
+        // GIỮ ĐÚNG CÔNG THỨC VB:
+        //
+        // TONG_TIEN -
+        // (
+        //     TONG_THANH_TOAN_BILL -
+        //     TONG_TIEN_GIAM_TRU
+        // )
+        //
+        // KHÔNG đổi thành:
+        //
+        // TONG_TIEN
+        // - TONG_THANH_TOAN_BILL
+        // - TONG_TIEN_GIAM_TRU
+        //
+        // vì sẽ khác hệ thống cũ.
+        // ========================================================================
+
+        var tongNo = await query
+            .Where(x =>
+                x.TongTien.HasValue &&
+                x.TongThanhToanBill.HasValue &&
+                x.TongTienGiamTru.HasValue)
+            .Select(x =>
+                (decimal?)(
+                    x.TongTien.Value -
+                    (
+                        x.TongThanhToanBill.Value -
+                        x.TongTienGiamTru.Value
+                    )
+                ))
+            .SumAsync(cancellationToken);
+
+
+        return Convert.ToInt64(
+            tongNo ?? 0m);
+    }
+
+
+    // ============================================================================
+    // TÍNH TỔNG TIỀN NỢ
+    //
+    // VB gốc:
+    //
+    // Private Function get_tong_tien_no(
+    //     ByVal CUST_ID As String) As Long
+    // ============================================================================
+
+    private async Task<long> GetTongTienNoAsync(
+        string maKH,
+        CancellationToken cancellationToken = default)
+    {
+        // ========================================================================
+        // KIỂM TRA CÓ ĐIỀU CHỈNH GIẢM KHÔNG
+        // ========================================================================
+
+        var coDieuChinhGiam = await KiemTraDcGiamAsync(
+            maKH,
+            cancellationToken);
+
+
+        // ========================================================================
+        // CÓ ĐIỀU CHỈNH GIẢM
+        // ========================================================================
+
+        if (coDieuChinhGiam)
+        {
+            return await GetTongTienNoDieuChinhSubAsync(
+                maKH,
+                cancellationToken);
+        }
+
+
+        // ========================================================================
+        // KHÔNG CÓ ĐIỀU CHỈNH GIẢM
+        //
+        // VB:
+        //
+        // SELECT
+        //
+        // SUM(
+        //     TONG_TIEN
+        //     - TONG_THANH_TOAN_BILL
+        //     - TONG_TIEN_GIAM_TRU
+        // ) AS tienno
+        //
+        // FROM CONG_NO
+        //
+        // WHERE MA_KHACH_HANG = CUST_ID
+        //
+        // AND TRANG_THAI = 1
+        //
+        // AND MA_DON_VI = 0
+        //
+        // AND TONG_TIEN >
+        //     (
+        //         TONG_THANH_TOAN_BILL +
+        //         TONG_TIEN_GIAM_TRU
+        //     )
+        //
+        // AND LOAI_HOA_DON <> 5
+        // ========================================================================
+
+        var tongNo = await _context.CongNos
+            .AsNoTracking()
+            .Where(x =>
+
+                x.MaKhachHang == maKH &&
+
+                x.TrangThai == 1 &&
+
+                x.MaDonVi == 0 &&
+
+                x.LoaiHoaDon != 5 &&
+
+
+                // Giữ semantics SQL Oracle
+                // thay vì tự COALESCE NULL thành 0.
+
+                x.TongTien.HasValue &&
+                x.TongThanhToanBill.HasValue &&
+                x.TongTienGiamTru.HasValue &&
+
+
+                x.TongTien.Value >
+                    x.TongThanhToanBill.Value +
+                    x.TongTienGiamTru.Value
+            )
+            .Select(x =>
+                (decimal?)(
+                    x.TongTien.Value
+                    - x.TongThanhToanBill.Value
+                    - x.TongTienGiamTru.Value
+                ))
+            .SumAsync(cancellationToken);
+
+
+        return Convert.ToInt64(
+            tongNo ?? 0m);
+    }
+
+
+    // ============================================================================
+    // GET TỔNG DƯ NỢ THEO MÃ KHÁCH HÀNG V2
+    //
+    // VB gốc:
+    //
+    // Public Function get_Tong_Du_No_Theo_maKH_V2(
+    //     ByVal maKH As String) As String
+    //
+    // Nếu tiền nợ = 0
+    // => "Hết nợ"
+    //
+    // LƯU Ý:
+    //
+    // VB dùng:
+    //
+    // If tien_no = 0 Then
+    //
+    // KHÔNG phải:
+    //
+    // tien_no <= 0
+    // ============================================================================
+
+    private async Task<string> GetTongDuNoTheoMaKhV2Async(
+        string maKH,
+        CancellationToken cancellationToken = default)
+    {
+        var tienNo = await GetTongTienNoAsync(
+            maKH,
+            cancellationToken);
+
+
+        // VB:
+        //
+        // If tien_no = 0 Then
+        //     tien_no = "Hết nợ"
+        // End If
+
+        if (tienNo == 0)
             return "Hết nợ";
 
-        return tienNo.ToString(CultureInfo.InvariantCulture);
+
+        return tienNo.ToString(
+            CultureInfo.InvariantCulture);
     }
 
 
@@ -1359,22 +2040,24 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
     public async Task<ContentResult> P_88_LAY_TT_CAT_MO_NUOC(string? MA_KHACH_HANG, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
         var customerCode = (MA_KHACH_HANG ?? string.Empty).PadLeft(9, '0');
-        var catMoNuocRows = await _billing.Aereport.AsNoTracking()
-            .Where(x => x.CUSTID == customerCode)
-            .Select(x => new
-            {
-                x.ERPTTYPE,
-                x.ERPTSTS,
-                NGAY_THUC_HIEN = x.DATECREATE,
-                NGUOI_THUC_HIEN = x.EXECUTER,
-                LY_DO = x.RPTREASON,
-                CHI_SO_NIEM = x.READSEAL,
-                CHI_SO_NUOC = x.READCURR,
-                GHI_CHU_1 = x.ERPTCONTENT1,
-                GHI_CHU_2 = x.ERPTCONTENT2,
-                TONG_TIEN_NO = x.TOTAL
-            })
-            .ToListAsync(cancellationToken);
+        var catMoNuocRows = await _billing.Aereport
+        .AsNoTracking()
+        .Where(x => x.CUSTID == customerCode)
+        .OrderByDescending(x => x.DATECREATE)
+        .Select(x => new
+        {
+            x.ERPTTYPE,
+            x.ERPTSTS,
+            NGAY_THUC_HIEN = x.DATECREATE,
+            NGUOI_THUC_HIEN = x.EXECUTER,
+            LY_DO = x.RPTREASON,
+            CHI_SO_NIEM = x.READSEAL,
+            CHI_SO_NUOC = x.READCURR,
+            GHI_CHU_1 = x.ERPTCONTENT1,
+            GHI_CHU_2 = x.ERPTCONTENT2,
+            TONG_TIEN_NO = x.TOTAL
+        })
+        .ToListAsync(cancellationToken);
 
         object[] response = catMoNuocRows.Count == 0
             ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } }
@@ -1942,23 +2625,39 @@ public sealed class ReadMeterBusinesses : IReadMeterBusinesses
         }
 
         var priceFeeRows = await (
-            from basePrice in _context.KDmGia.AsNoTracking()
-            where basePrice.HieuLuc == "1" && basePrice.KieuGia == "0"
-            join sub in _context.KDmGiaSubs.AsNoTracking() on basePrice.KyHieuGia equals sub.MaGia into subPrices
-            from sub in subPrices.DefaultIfEmpty()
-            join vat in _context.KDmGiaPhis.AsNoTracking() on basePrice.MaThueVat equals vat.MaPhi into vatFees
-            from vat in vatFees.DefaultIfEmpty()
-            join fee in _context.KDmGiaPhis.AsNoTracking() on basePrice.MaPhiBvmt equals fee.MaPhi into environmentFees
-            from fee in environmentFees.DefaultIfEmpty()
-            select new
-            {
-                basePrice.KyHieuGia,
-                Loai = sub == null ? null : sub.Loai,
-                VatRate = vat == null ? 0m : (vat.GiaTri ?? 0m) / 100m,
-                PhiGiaTri = fee == null ? 0m : fee.GiaTri ?? 0m,
-                KieuPhi = fee == null ? null : fee.KieuPhi,
-                HasPhi = fee != null
-            }).ToListAsync(cancellationToken);
+    from basePrice in _context.KDmGia.AsNoTracking()
+    where basePrice.HieuLuc == "1" && basePrice.KieuGia == "0"
+
+    join sub in _context.KDmGiaSubs.AsNoTracking()
+        on basePrice.KyHieuGia equals sub.MaGia into subPrices
+    from sub in subPrices.DefaultIfEmpty()
+
+    join vat in _context.KDmGiaPhis.AsNoTracking()
+        on basePrice.MaThueVat equals vat.MaPhi into vatFees
+    from vat in vatFees.DefaultIfEmpty()
+
+    join fee in _context.KDmGiaPhis.AsNoTracking()
+        on basePrice.MaPhiBvmt equals fee.MaPhi into environmentFees
+    from fee in environmentFees.DefaultIfEmpty()
+
+    select new
+    {
+        basePrice.KyHieuGia,
+
+        // Không so sánh entity với null
+        Loai = sub.Loai,
+
+        // LEFT JOIN không có dữ liệu => property SQL trả NULL
+        VatRate = (vat.GiaTri ?? 0m) / 100m,
+
+        PhiGiaTri = fee.GiaTri ?? 0m,
+
+        KieuPhi = fee.KieuPhi,
+
+        // Dùng property để xác định có dòng phí hay không
+        HasPhi = fee.MaPhi != null
+    }
+).ToListAsync(cancellationToken);
 
         priceFeeConfigs = priceFeeRows
             .Where(x => !string.IsNullOrWhiteSpace(x.KyHieuGia))
