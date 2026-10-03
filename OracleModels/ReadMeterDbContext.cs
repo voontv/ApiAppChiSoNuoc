@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -121,13 +121,11 @@ public partial class ReadMeterDbContext : DbContext
 
     public virtual DbSet<LogSm> LogSms { get; set; }
 
+    public virtual DbSet<LogThongTinKhSoDienThoai> LogThongTinKhSoDienThoais { get; set; }
+
     public virtual DbSet<Password> Passwords { get; set; }
 
     public virtual DbSet<ThongTinKh> ThongTinKhs { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseOracle("DATA SOURCE=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=200.201.222.8)(PORT=1521))(CONNECT_DATA=(SID=GEN)));USER ID=gen_loc; Password=heovang;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -4640,6 +4638,37 @@ public partial class ReadMeterDbContext : DbContext
                 .HasColumnName("ZALO");
         });
 
+        modelBuilder.Entity<LogThongTinKhSoDienThoai>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_LOG_THONG_TIN_KH_SDT");
+
+            entity.ToTable("LOG_THONG_TIN_KH_SO_DIEN_THOAI");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd()
+                .HasColumnType("NUMBER")
+                .HasColumnName("ID");
+            entity.Property(e => e.GiaTriCu)
+                .HasMaxLength(12)
+                .IsUnicode(false)
+                .HasColumnName("GIA_TRI_CU");
+            entity.Property(e => e.GiaTriMoi)
+                .HasMaxLength(12)
+                .IsUnicode(false)
+                .HasColumnName("GIA_TRI_MOI");
+            entity.Property(e => e.MaBienDoc)
+                .HasMaxLength(6)
+                .IsUnicode(false)
+                .HasColumnName("MA_BIEN_DOC");
+            entity.Property(e => e.MaKhachHang)
+                .HasMaxLength(9)
+                .IsUnicode(false)
+                .HasColumnName("MA_KHACH_HANG");
+            entity.Property(e => e.NgayThucHien)
+                .HasColumnType("DATE")
+                .HasColumnName("NGAY_THUC_HIEN");
+        });
+
         modelBuilder.Entity<Password>(entity =>
         {
             entity
@@ -4977,6 +5006,10 @@ public partial class ReadMeterDbContext : DbContext
                 .HasMaxLength(1)
                 .IsUnicode(false)
                 .HasColumnName("SMS");
+            entity.Property(e => e.SoDienThoaiCuLuu)
+                .HasMaxLength(12)
+                .IsUnicode(false)
+                .HasColumnName("SO_DIEN_THOAI_CU_LUU");
             entity.Property(e => e.SoHo)
                 .HasColumnType("NUMBER(38)")
                 .HasColumnName("SO_HO");
@@ -5051,6 +5084,7 @@ public partial class ReadMeterDbContext : DbContext
         modelBuilder.HasSequence("DEPT_SEQ");
         modelBuilder.HasSequence("SEQ_BILLING_MAPPING");
         modelBuilder.HasSequence("SEQ_BILLING_TRANSACTION");
+        modelBuilder.HasSequence("SEQ_LOG_THONG_TIN_KH_SDT");
         modelBuilder.HasSequence("TAXOUT_SEQ");
         modelBuilder.HasSequence("WEB_01_DANG_KY_DON_SEQ");
         modelBuilder.HasSequence("WEB_10_VAN_DONG_MO_SEQ");

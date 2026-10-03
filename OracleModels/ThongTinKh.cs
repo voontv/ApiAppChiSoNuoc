@@ -156,4 +156,6 @@ public partial class ThongTinKh
     public string? TenPhuongCu { get; set; }
 
     public string? ChiNhanhCu { get; set; }
+
+    public string? SoDienThoaiCuLuu { get; set; }
 }

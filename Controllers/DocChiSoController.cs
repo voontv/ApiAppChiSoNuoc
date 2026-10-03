@@ -192,4 +192,8 @@ public sealed class DocChiSoController : ControllerBase
     public Task<ContentResult> P_9E_SUA_THONG_TIN_KH([FromBody] P_9E_SUA_THONG_TIN_KHRequest request, CancellationToken cancellationToken) =>
         _businesses.P_9E_SUA_THONG_TIN_KH(request, cancellationToken);
 
+    [HttpPost("UpdateSoDienThoai")]
+    public Task P_9E_SUA_THONG_TIN_KH([FromBody] ThongTinUpdateRequest dk) =>
+        _businesses.UpdateSoDienThoaiKhachHang(dk);
+
 }

@@ -6,6 +6,7 @@ using Microsoft.OpenApi.Models;
 using ReadMeter.Api.Businesses;
 using ReadMeter.Api.Configuration;
 using ReadMeter.Api.Data;
+using ReadMeter.Api.LibsStartup;
 using ReadMeter.Api.OracleModels;
 
 namespace ReadMeter.Api;
@@ -23,7 +24,7 @@ public class Startup
     {
         Console.OutputEncoding = Encoding.UTF8;
 
-        services.AddControllers().AddJsonOptions(ConfigureJson);
+        services.AddMvc(FilterHelper.Register).AddJsonOptions(ConfigureJson);
         services.AddHealthChecks();
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(options =>
