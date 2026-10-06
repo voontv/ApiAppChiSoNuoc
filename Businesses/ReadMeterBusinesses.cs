@@ -299,21 +299,58 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
         TraCuu
     }
 
-    private static string GetCustomerReadingOrderBy(string? sortBy)
+    private sealed class CustomerReadingProjection
+    {
+        public string ROOT { get; set; } = "00- OK";
+        public string? ID_DONG_HO { get; set; }
+        public string? MA_KHACH_HANG { get; set; }
+        public string? TEN_KHACH_HANG { get; set; }
+        public string? DIA_CHI_DONG_HO { get; set; }
+        public string? TEN_DONG_HO { get; set; }
+        public string? CO_DH { get; set; }
+        public string? HT_KD { get; set; }
+        public string? SO_SERIAL_DONG_HO { get; set; }
+        public string? PHONE_UT1 { get; set; }
+        public string? EMAIL_UT1 { get; set; }
+        public string? MA_GIA { get; set; }
+        public string? SO_O_CUA_SO { get; set; }
+        public decimal? CHI_SO_CU { get; set; }
+        public decimal? CHI_SO_MOI { get; set; }
+        public decimal? SAN_LUONG_TT { get; set; }
+        public decimal? TONG_SL { get; set; }
+        public string? MA_TINH_TRANG_DH { get; set; }
+        public decimal? STT_SO_DOC { get; set; }
+        public decimal? STT_SO_DOC_MOI { get; set; }
+        public DateTime? NGAY_DOC_DK { get; set; }
+        public DateTime? NGAY_DOC_CS { get; set; }
+        public DateTime? NGAY_DOC_TUNG_DH { get; set; }
+        public string? QUA_VONG { get; set; }
+        public string? LOAI_CHI_SO { get; set; }
+        public decimal? CONG_CHI_SO { get; set; }
+        public decimal? SAN_LUONG_DUNG_IT { get; set; }
+        public string? MA_GHI_CHU { get; set; }
+        public string? GHI_CHU { get; set; }
+        public string? VI_TRI_DOC { get; set; }
+        public string? VI_TRI_DOC_CU { get; set; }
+        public string? TEN_FILE_ANH { get; set; }
+        public decimal? SL_TB_3THANG { get; set; }
+    }
+
+    private static IQueryable<CustomerReadingProjection> OrderCustomerReading(IQueryable<CustomerReadingProjection> query, string? sortBy)
     {
         if (string.IsNullOrWhiteSpace(sortBy))
-            return "cs.STT_SO_DOC";
+            return query.OrderBy(x => x.STT_SO_DOC);
 
         return sortBy.Trim().ToUpperInvariant() switch
         {
-            "STT_SO_DOC" => "cs.STT_SO_DOC",
-            "STT_SO_DOC_MOI" => "cs.STT_SO_DOC_MOI",
-            "MA_KHACH_HANG" => "cs.MA_KHACH_HANG",
-            "TEN_KHACH_HANG" => "kh.TEN_KHACH_HANG",
-            "DIA_CHI_DONG_HO" => "kh.DIA_CHI_DONG_HO",
-            "NGAY_DOC_DK" => "cs.NGAY_DOC_DK",
-            "NGAY_DOC_CS" => "cs.NGAY_DOC_CS",
-            _ => "cs.STT_SO_DOC"
+            "STT_SO_DOC" => query.OrderBy(x => x.STT_SO_DOC),
+            "STT_SO_DOC_MOI" => query.OrderBy(x => x.STT_SO_DOC_MOI),
+            "MA_KHACH_HANG" => query.OrderBy(x => x.MA_KHACH_HANG),
+            "TEN_KHACH_HANG" => query.OrderBy(x => x.TEN_KHACH_HANG),
+            "DIA_CHI_DONG_HO" => query.OrderBy(x => x.DIA_CHI_DONG_HO),
+            "NGAY_DOC_DK" => query.OrderBy(x => x.NGAY_DOC_DK),
+            "NGAY_DOC_CS" => query.OrderBy(x => x.NGAY_DOC_CS),
+            _ => query.OrderBy(x => x.STT_SO_DOC)
         };
     }
 
@@ -322,152 +359,151 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
         string? phone, string? bookCode, string? meterReader, string? month, string? filter,
         string? sortBy, CustomerReadingMode mode, CancellationToken cancellationToken)
     {
-        var where = new StringBuilder();
-        var parameters = new List<OracleParameter>();
-
         var isNormalOrSub = mode is CustomerReadingMode.Normal or CustomerReadingMode.Sub;
         var isSubBs = mode == CustomerReadingMode.SubBs;
-        var isTraCuu = mode == CustomerReadingMode.TraCuu;
+        var query =
+            from reading in _context.AppDhChiSos.AsNoTracking()
+            join customerJoin in _context.ThongTinKhs.AsNoTracking()
+                on reading.MaKhachHang equals customerJoin.MaKhachHang into customers
+            from customer in customers.DefaultIfEmpty()
+            select new { reading, customer };
 
-        // Giữ đúng VB cũ cho P_03 / P_03_SUB / P_03_SUB_BS:
-        // nếu có ID thì lọc ID_DCS + MA_SO_DOC, không ép MA_BIEN_DOC/THANG.
         if (!string.IsNullOrWhiteSpace(id))
         {
-            where.AppendLine("WHERE cs.ID_DCS = :id");
-            where.AppendLine("  AND cs.MA_SO_DOC = :bookCode");
-            parameters.Add(Param("id", id));
-            parameters.Add(Param("bookCode", bookCode));
+            query = query.Where(x =>
+                x.reading.IdDcs == id &&
+                x.reading.MaSoDoc == bookCode);
         }
         else
         {
-            where.AppendLine("""
-                WHERE cs.MA_SO_DOC = :bookCode
-                  AND cs.MA_BIEN_DOC = :meterReader
-                  AND cs.THANG = :month
-                """);
-            parameters.Add(Param("bookCode", bookCode));
-            parameters.Add(Param("meterReader", meterReader));
-            parameters.Add(Param("month", month));
+            query = query.Where(x =>
+                x.reading.MaSoDoc == bookCode &&
+                x.reading.MaBienDoc == meterReader &&
+                x.reading.Thang == month);
 
-            // P_03 và P_03_SUB có 3 điều kiện này trong VB cũ.
-            // P_03_SUB_BS đã comment 3 điều kiện này.
-            // P_0313 giữ nguyên kiểu tra cứu hiện tại: không áp 3 điều kiện khóa.
             if (isNormalOrSub)
             {
-                where.AppendLine("  AND cs.NGAY_EBILL_NHAN_KHOA IS NULL");
-                where.AppendLine("  AND cs.NGAY_EBILL_NAP_BILL IS NULL");
-                where.AppendLine("  AND cs.NGAY_BD_NHAN_KHOA IS NOT NULL");
+                query = query.Where(x =>
+                    x.reading.NgayEbillNhanKhoa == null &&
+                    x.reading.NgayEbillNapBill == null &&
+                    x.reading.NgayBdNhanKhoa != null);
             }
         }
 
         if (decimal.TryParse(sequence, out var rawSequenceValue))
-        {
-            where.AppendLine("  AND cs.STT_SO_DOC = :sequence");
-            parameters.Add(Param("sequence", rawSequenceValue));
-        }
+            query = query.Where(x => x.reading.SttSoDoc == rawSequenceValue);
 
-        // VB cũ: P_03 và P_03_SUB có KIEU_LOC.
-        // P_03_SUB_BS đã comment toàn bộ KIEU_LOC.
         if (isNormalOrSub)
         {
             if (filter == "1")
-                where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NOT NULL");
+                query = query.Where(x => x.reading.NgayDocTungDh != null);
             else if (filter == "2")
-                where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NULL");
+                query = query.Where(x => x.reading.NgayDocTungDh == null);
         }
 
-        // P_03_SUB_BS luôn chỉ lấy mã tình trạng BS.
         if (isSubBs)
-            where.AppendLine("  AND cs.MA_TINH_TRANG_DH = 'BS'");
+            query = query.Where(x => x.reading.MaTinhTrangDh == "BS");
 
-        // VB cũ dùng so sánh chính xác MA_KHACH_HANG, không dùng LIKE.
         if (!string.IsNullOrWhiteSpace(customerCode))
-        {
-            where.AppendLine("  AND cs.MA_KHACH_HANG = :customerCode");
-            parameters.Add(Param("customerCode", customerCode));
-        }
+            query = query.Where(x => x.reading.MaKhachHang == customerCode);
 
         if (!string.IsNullOrWhiteSpace(customerName))
-        {
-            where.AppendLine("  AND UPPER(kh.TEN_KHACH_HANG) LIKE UPPER(:customerName)");
-            parameters.Add(NParam("customerName", $"%{customerName}%"));
-        }
+            query = query.Where(x => EF.Functions.Like(x.customer.TenKhachHang!, $"%{customerName}%"));
 
         if (!string.IsNullOrWhiteSpace(address))
-        {
-            where.AppendLine("  AND UPPER(kh.DIA_CHI_DONG_HO) LIKE UPPER(:address)");
-            parameters.Add(NParam("address", $"%{address}%"));
-        }
+            query = query.Where(x => EF.Functions.Like(x.customer.DiaChiDongHo!, $"%{address}%"));
 
         if (!string.IsNullOrWhiteSpace(phone))
+            query = query.Where(x => EF.Functions.Like(x.customer.PhoneUt1!, $"%{phone}%"));
+
+        query = query.Where(x => x.customer.NgayThanhLyHd == null);
+
+        var projectedQuery = query.Select(x => new CustomerReadingProjection
         {
-            where.AppendLine("  AND kh.PHONE_UT1 LIKE :phone");
-            parameters.Add(Param("phone", $"%{phone}%"));
-        }
+            ID_DONG_HO = x.reading.IdDcs,
+            MA_KHACH_HANG = x.customer.MaKhachHang,
+            TEN_KHACH_HANG = x.customer.TenKhachHang,
+            DIA_CHI_DONG_HO = x.customer.DiaChiDongHo,
+            TEN_DONG_HO = x.customer.TenDongHo,
+            CO_DH = x.customer.MaDongHo,
+            HT_KD = x.customer.HtKd,
+            SO_SERIAL_DONG_HO = x.customer.SoSerialDongHo,
+            PHONE_UT1 = x.customer.PhoneUt1,
+            EMAIL_UT1 = x.customer.EmailUt1,
+            MA_GIA = x.customer.MaGia,
+            SO_O_CUA_SO = x.customer.SoOCuaSo,
+            CHI_SO_CU = x.reading.ChiSoCu,
+            CHI_SO_MOI = x.reading.ChiSoMoi,
+            SAN_LUONG_TT = x.reading.SanLuongTt,
+            TONG_SL = x.reading.TongSl,
+            MA_TINH_TRANG_DH = x.reading.MaTinhTrangDh,
+            STT_SO_DOC = x.reading.SttSoDoc,
+            STT_SO_DOC_MOI = x.reading.SttSoDocMoi ?? x.reading.SttSoDoc,
+            NGAY_DOC_DK = x.reading.NgayDocDk,
+            NGAY_DOC_CS = x.reading.NgayDocCs,
+            NGAY_DOC_TUNG_DH = x.reading.NgayDocTungDh,
+            QUA_VONG = x.reading.QuaVong,
+            LOAI_CHI_SO = x.reading.LoaiChiSo,
+            CONG_CHI_SO = x.reading.CongChiSo,
+            SAN_LUONG_DUNG_IT = x.reading.SanLuongDungIt,
+            MA_GHI_CHU = x.reading.MaGhiChu,
+            GHI_CHU = x.reading.GhiChu,
+            VI_TRI_DOC = x.reading.ViTriDoc,
+            VI_TRI_DOC_CU = x.reading.ViTriDocCu,
+            TEN_FILE_ANH = x.reading.TenFileAnh,
+            SL_TB_3THANG = x.reading.SlTb3thang
+        });
 
-        // Ba hàm P_03 cũ dùng RIGHT OUTER JOIN từ THONG_TIN_KH sang APP_DH_CHI_SO,
-        // tương đương APP_DH_CHI_SO LEFT JOIN THONG_TIN_KH.
-        // Riêng P_0313 chưa có source VB trong phần đối chiếu nên giữ JOIN hiện tại.
-        var joinClause = isTraCuu
-            ? "JOIN THONG_TIN_KH kh ON kh.MA_KHACH_HANG = cs.MA_KHACH_HANG"
-            : "LEFT JOIN THONG_TIN_KH kh ON kh.MA_KHACH_HANG = cs.MA_KHACH_HANG";
+        projectedQuery = OrderCustomerReading(projectedQuery, sortBy);
 
-        // Ba hàm P_03 cũ dùng SAP_XEP_THEO, mặc định STT_SO_DOC.
-        // P_0313 giữ nguyên thứ tự hiện tại vì chưa có hàm VB gốc để đối chiếu.
-        var orderBy = isTraCuu
-            ? "NVL(cs.STT_SO_DOC_MOI, cs.STT_SO_DOC)"
-            : GetCustomerReadingOrderBy(sortBy);
-
-        // PHẦN SELECT/RESPONSE GIỮ NGUYÊN như file hiện tại để không thay đổi dữ liệu trả client.
-        var rows = await QueryRowsAsync($"""
-            SELECT
-                '00- OK' ROOT,
-                cs.ID_DCS ID_DONG_HO,
-                kh.MA_KHACH_HANG,
-                kh.TEN_KHACH_HANG,
-                kh.DIA_CHI_DONG_HO,
-                kh.TEN_DONG_HO,
-                kh.MA_DONG_HO CO_DH,
-                kh.HT_KD,
-                kh.SO_SERIAL_DONG_HO,
-                kh.PHONE_UT1,
-                kh.EMAIL_UT1,
-                kh.MA_GIA,
-                kh.SO_O_CUA_SO,
-                cs.CHI_SO_CU,
-                cs.CHI_SO_MOI,
-                cs.SAN_LUONG_TT,
-                cs.TONG_SL,
-                cs.MA_TINH_TRANG_DH,
-                cs.STT_SO_DOC,
-                cs.STT_SO_DOC_MOI,
-                cs.NGAY_DOC_DK,
-                cs.NGAY_DOC_CS,
-                cs.NGAY_DOC_TUNG_DH,
-                CASE WHEN cs.NGAY_DOC_TUNG_DH IS NOT NULL THEN 'Đã ghi' ELSE 'Chưa ghi' END TINH_TRANG_CS,
-                cs.QUA_VONG,
-                cs.LOAI_CHI_SO,
-                cs.CONG_CHI_SO,
-                cs.SAN_LUONG_DUNG_IT,
-                cs.MA_GHI_CHU,
-                cs.GHI_CHU,
-                cs.VI_TRI_DOC,
-                cs.VI_TRI_DOC_CU,
-                cs.TEN_FILE_ANH,
-                cs.SL_TB_3THANG
-            FROM APP_DH_CHI_SO cs
-            {joinClause}
-            {where}
-              AND kh.NGAY_THANH_LY_HD IS NULL
-            ORDER BY {orderBy}
-            """, parameters, cancellationToken);
+        var data = await projectedQuery.ToListAsync(cancellationToken);
+        var rows = data
+            .Select(x => new
+            {
+                x.ROOT,
+                x.ID_DONG_HO,
+                x.MA_KHACH_HANG,
+                x.TEN_KHACH_HANG,
+                x.DIA_CHI_DONG_HO,
+                x.TEN_DONG_HO,
+                x.CO_DH,
+                x.HT_KD,
+                x.SO_SERIAL_DONG_HO,
+                x.PHONE_UT1,
+                x.EMAIL_UT1,
+                x.MA_GIA,
+                x.SO_O_CUA_SO,
+                x.CHI_SO_CU,
+                x.CHI_SO_MOI,
+                x.SAN_LUONG_TT,
+                x.TONG_SL,
+                x.MA_TINH_TRANG_DH,
+                x.STT_SO_DOC,
+                x.STT_SO_DOC_MOI,
+                x.NGAY_DOC_DK,
+                NGAY_DOC_CS = x.NGAY_DOC_CS.HasValue
+                    ? x.NGAY_DOC_CS.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+                    : string.Empty,
+                x.NGAY_DOC_TUNG_DH,
+                TINH_TRANG_CS = x.NGAY_DOC_TUNG_DH.HasValue ? "\u0110\u00e3 ghi" : "Ch\u01b0a ghi",
+                x.QUA_VONG,
+                x.LOAI_CHI_SO,
+                x.CONG_CHI_SO,
+                x.SAN_LUONG_DUNG_IT,
+                x.MA_GHI_CHU,
+                x.GHI_CHU,
+                x.VI_TRI_DOC,
+                x.VI_TRI_DOC_CU,
+                x.TEN_FILE_ANH,
+                x.SL_TB_3THANG
+            })
+            .ToList();
 
         return JsonObject(rows.Count == 0
-            ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } }
+            ? new object[] { new { ROOT = "16- D\u1eef li\u1ec7u kh\u00f4ng t\u00ecm th\u1ea5y. Vui l\u00f2ng ki\u1ec3m tra l\u1ea1i!" } }
             : rows.Cast<object>());
 
     }
-
     private async Task<ContentResult> SaveMeterReading(
         string? id, string? status, string? rollover, string? readingType, string? readingDate,
         string? currentReading, string? actualUsage, string? totalUsage, string? accumulatedReading,
@@ -3528,10 +3564,3 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
     }
 
 }
-
-
-
-
-
-
-
