@@ -127,6 +127,14 @@ public partial class ReadMeterDbContext : DbContext
 
     public virtual DbSet<ThongTinKh> ThongTinKhs { get; set; }
 
+    public virtual DbSet<Web0800PhieuYeuCauChung> Web0800PhieuYeuCauChungs { get; set; }
+
+    public virtual DbSet<Web0899DmNguonTt> Web0899DmNguonTts { get; set; }
+
+    public virtual DbSet<WebDmTrangThaiHsOb> WebDmTrangThaiHsObs { get; set; }
+
+    public virtual DbSet<WebDmTrangThaiHsYcc> WebDmTrangThaiHsYccs { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("GEN_LOC");
@@ -2506,13 +2514,13 @@ public partial class ReadMeterDbContext : DbContext
                 .HasMaxLength(150)
                 .HasColumnName("DIA_CHI_DONG_HO");
             entity.Property(e => e.GhiChu)
-                .HasMaxLength(200)
+                .HasMaxLength(250)
                 .HasColumnName("GHI_CHU");
             entity.Property(e => e.GhiChuCc)
                 .HasMaxLength(200)
                 .HasColumnName("GHI_CHU_CC");
             entity.Property(e => e.IdDangKy)
-                .HasMaxLength(9)
+                .HasMaxLength(25)
                 .IsUnicode(false)
                 .HasColumnName("ID_DANG_KY");
             entity.Property(e => e.IdYeuCau)
@@ -2958,6 +2966,10 @@ public partial class ReadMeterDbContext : DbContext
                 .HasMaxLength(2)
                 .HasDefaultValueSql("0 ")
                 .HasColumnName("BAN_GIAO");
+            entity.Property(e => e.BankTransId)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasColumnName("BANK_TRANS_ID");
             entity.Property(e => e.DaLuuEbilsub1)
                 .HasMaxLength(1)
                 .IsUnicode(false)
@@ -5078,6 +5090,384 @@ public partial class ReadMeterDbContext : DbContext
             entity.Property(e => e.VungCu)
                 .HasMaxLength(100)
                 .HasColumnName("VUNG_CU");
+        });
+
+        modelBuilder.Entity<Web0800PhieuYeuCauChung>(entity =>
+        {
+            entity.HasKey(e => e.IdPhieuYeuCauChung).HasName("WEB_08_SU_CO_PK");
+
+            entity.ToTable("WEB_0800_PHIEU_YEU_CAU_CHUNG");
+
+            entity.Property(e => e.IdPhieuYeuCauChung)
+                .HasMaxLength(9)
+                .IsUnicode(false)
+                .HasColumnName("ID_PHIEU_YEU_CAU_CHUNG");
+            entity.Property(e => e.B020GcXnGiaoNt)
+                .HasMaxLength(50)
+                .HasColumnName("B_020_GC_XN_GIAO_NT");
+            entity.Property(e => e.B020MaCongViec)
+                .HasMaxLength(5)
+                .IsUnicode(false)
+                .HasColumnName("B_020_MA_CONG_VIEC");
+            entity.Property(e => e.B020MaDoUuTien)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .HasColumnName("B_020_MA_DO_UU_TIEN");
+            entity.Property(e => e.B020MaNhomCongViec)
+                .HasMaxLength(3)
+                .IsUnicode(false)
+                .HasColumnName("B_020_MA_NHOM_CONG_VIEC");
+            entity.Property(e => e.B020NgayXnGiaoNt)
+                .HasColumnType("DATE")
+                .HasColumnName("B_020_NGAY_XN_GIAO_NT");
+            entity.Property(e => e.B020NhomTruongMa)
+                .HasMaxLength(4)
+                .IsUnicode(false)
+                .HasColumnName("B_020_NHOM_TRUONG_MA");
+            entity.Property(e => e.B020NhomTruongTen)
+                .HasMaxLength(40)
+                .HasColumnName("B_020_NHOM_TRUONG_TEN");
+            entity.Property(e => e.B020TenCongViec)
+                .HasMaxLength(50)
+                .HasColumnName("B_020_TEN_CONG_VIEC");
+            entity.Property(e => e.B020TenDoUuTien)
+                .HasMaxLength(50)
+                .HasColumnName("B_020_TEN_DO_UU_TIEN");
+            entity.Property(e => e.B020TenNhomCongViec)
+                .HasMaxLength(50)
+                .HasColumnName("B_020_TEN_NHOM_CONG_VIEC");
+            entity.Property(e => e.B020UsrXnGiaoNt)
+                .HasMaxLength(15)
+                .IsUnicode(false)
+                .HasColumnName("B_020_USR_XN_GIAO_NT");
+            entity.Property(e => e.B030GcNtNhanXn)
+                .HasMaxLength(50)
+                .HasColumnName("B_030_GC_NT_NHAN_XN");
+            entity.Property(e => e.B030NgayNtNhanXn)
+                .HasColumnType("DATE")
+                .HasColumnName("B_030_NGAY_NT_NHAN_XN");
+            entity.Property(e => e.B040CongNhanMa01)
+                .HasMaxLength(4)
+                .IsUnicode(false)
+                .HasColumnName("B_040_CONG_NHAN_MA_01");
+            entity.Property(e => e.B040CongNhanMa02)
+                .HasMaxLength(4)
+                .IsUnicode(false)
+                .HasColumnName("B_040_CONG_NHAN_MA_02");
+            entity.Property(e => e.B040CongNhanMa03)
+                .HasMaxLength(4)
+                .IsUnicode(false)
+                .HasColumnName("B_040_CONG_NHAN_MA_03");
+            entity.Property(e => e.B040CongNhanTen01)
+                .HasMaxLength(40)
+                .HasColumnName("B_040_CONG_NHAN_TEN_01");
+            entity.Property(e => e.B040CongNhanTen02)
+                .HasMaxLength(40)
+                .HasColumnName("B_040_CONG_NHAN_TEN_02");
+            entity.Property(e => e.B040CongNhanTen03)
+                .HasMaxLength(40)
+                .IsUnicode(false)
+                .HasColumnName("B_040_CONG_NHAN_TEN_03");
+            entity.Property(e => e.B040GcNtGiaoCn)
+                .HasMaxLength(50)
+                .HasColumnName("B_040_GC_NT_GIAO_CN");
+            entity.Property(e => e.B040NgayNtGiaoCn)
+                .HasColumnType("DATE")
+                .HasColumnName("B_040_NGAY_NT_GIAO_CN");
+            entity.Property(e => e.B050GcCnNhanNt)
+                .HasMaxLength(50)
+                .HasColumnName("B_050_GC_CN_NHAN_NT");
+            entity.Property(e => e.B050NgayCnNhanNt)
+                .HasColumnType("DATE")
+                .HasColumnName("B_050_NGAY_CN_NHAN_NT");
+            entity.Property(e => e.B060AnhBanDauFile01)
+                .HasMaxLength(40)
+                .IsUnicode(false)
+                .HasColumnName("B_060_ANH_BAN_DAU_FILE_01");
+            entity.Property(e => e.B060AnhHoanThanhFile02)
+                .HasMaxLength(40)
+                .IsUnicode(false)
+                .HasColumnName("B_060_ANH_HOAN_THANH_FILE_02");
+            entity.Property(e => e.B060AnhKhachHangKy)
+                .HasMaxLength(40)
+                .IsUnicode(false)
+                .HasColumnName("B_060_ANH_KHACH_HANG_KY");
+            entity.Property(e => e.B060GcCnTcXong)
+                .HasMaxLength(100)
+                .HasColumnName("B_060_GC_CN_TC_XONG");
+            entity.Property(e => e.B060HienTrangBanDau)
+                .HasMaxLength(80)
+                .HasColumnName("B_060_HIEN_TRANG_BAN_DAU");
+            entity.Property(e => e.B060MaKetQua)
+                .HasMaxLength(5)
+                .IsUnicode(false)
+                .HasColumnName("B_060_MA_KET_QUA");
+            entity.Property(e => e.B060NgayCnTcXong)
+                .HasColumnType("DATE")
+                .HasColumnName("B_060_NGAY_CN_TC_XONG");
+            entity.Property(e => e.B060NoiDungXuLy)
+                .HasMaxLength(80)
+                .HasColumnName("B_060_NOI_DUNG_XU_LY");
+            entity.Property(e => e.B060TenKetQua)
+                .HasMaxLength(80)
+                .HasColumnName("B_060_TEN_KET_QUA");
+            entity.Property(e => e.B060ViTri)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("B_060_VI_TRI");
+            entity.Property(e => e.B061GcCnTcTNgai)
+                .HasMaxLength(50)
+                .HasColumnName("B_061_GC_CN_TC_T_NGAI");
+            entity.Property(e => e.B061NgayCnTcTNgai)
+                .HasColumnType("DATE")
+                .HasColumnName("B_061_NGAY_CN_TC_T_NGAI");
+            entity.Property(e => e.B070GcCnGiaoNt)
+                .HasMaxLength(50)
+                .HasColumnName("B_070_GC_CN_GIAO_NT");
+            entity.Property(e => e.B070NgayCnGiaoNt)
+                .HasColumnType("DATE")
+                .HasColumnName("B_070_NGAY_CN_GIAO_NT");
+            entity.Property(e => e.B071GcCnGiaoNtTNgai)
+                .HasMaxLength(50)
+                .HasColumnName("B_071_GC_CN_GIAO_NT_T_NGAI");
+            entity.Property(e => e.B071NgayCnGiaoNtTNgai)
+                .HasColumnType("DATE")
+                .HasColumnName("B_071_NGAY_CN_GIAO_NT_T_NGAI");
+            entity.Property(e => e.B080GcNtNhanCn)
+                .HasMaxLength(50)
+                .HasColumnName("B_080_GC_NT_NHAN_CN");
+            entity.Property(e => e.B080NgayNtNhanCn)
+                .HasColumnType("DATE")
+                .HasColumnName("B_080_NGAY_NT_NHAN_CN");
+            entity.Property(e => e.B081GcNtNhanCnTNgai)
+                .HasMaxLength(50)
+                .HasColumnName("B_081_GC_NT_NHAN_CN_T_NGAI");
+            entity.Property(e => e.B081NgayNtNhanCnTNgai)
+                .HasColumnType("DATE")
+                .HasColumnName("B_081_NGAY_NT_NHAN_CN_T_NGAI");
+            entity.Property(e => e.B090GcNtGiaoXn)
+                .HasMaxLength(50)
+                .HasColumnName("B_090_GC_NT_GIAO_XN");
+            entity.Property(e => e.B090NgayNtGiaoXn)
+                .HasColumnType("DATE")
+                .HasColumnName("B_090_NGAY_NT_GIAO_XN");
+            entity.Property(e => e.B091GcNtGiaoXnTNgai)
+                .HasMaxLength(50)
+                .HasColumnName("B_091_GC_NT_GIAO_XN_T_NGAI");
+            entity.Property(e => e.B091NgayNtGiaoXnTNgai)
+                .HasColumnType("DATE")
+                .HasColumnName("B_091_NGAY_NT_GIAO_XN_T_NGAI");
+            entity.Property(e => e.B100GcXnNhanNt)
+                .HasMaxLength(50)
+                .HasColumnName("B_100_GC_XN_NHAN_NT");
+            entity.Property(e => e.B100MaNguyenNhan)
+                .HasMaxLength(15)
+                .IsUnicode(false)
+                .HasColumnName("B_100_MA_NGUYEN_NHAN");
+            entity.Property(e => e.B100NgayXnNhanNt)
+                .HasColumnType("DATE")
+                .HasColumnName("B_100_NGAY_XN_NHAN_NT");
+            entity.Property(e => e.B100TenNguyenNhan)
+                .HasMaxLength(45)
+                .HasColumnName("B_100_TEN_NGUYEN_NHAN");
+            entity.Property(e => e.B100UsrXnNhanNt)
+                .HasMaxLength(15)
+                .IsUnicode(false)
+                .HasColumnName("B_100_USR_XN_NHAN_NT");
+            entity.Property(e => e.B101GcXnNhanNtTNgai)
+                .HasMaxLength(50)
+                .HasColumnName("B_101_GC_XN_NHAN_NT_T_NGAI");
+            entity.Property(e => e.B101NgayXnNhanNtTNgai)
+                .HasColumnType("DATE")
+                .HasColumnName("B_101_NGAY_XN_NHAN_NT_T_NGAI");
+            entity.Property(e => e.B110GcXnBilling)
+                .HasMaxLength(20)
+                .HasColumnName("B_110_GC_XN_BILLING");
+            entity.Property(e => e.B110NgayXnBilling)
+                .HasColumnType("DATE")
+                .HasColumnName("B_110_NGAY_XN_BILLING");
+            entity.Property(e => e.B111GhXnBillingTNgai)
+                .HasMaxLength(20)
+                .HasColumnName("B_111_GH_XN_BILLING_T_NGAI");
+            entity.Property(e => e.B111NgayXnBillingTNgai)
+                .HasColumnType("DATE")
+                .HasColumnName("B_111_NGAY_XN_BILLING_T_NGAI");
+            entity.Property(e => e.CoThiCong)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .HasDefaultValueSql("1 ")
+                .HasColumnName("CO_THI_CONG");
+            entity.Property(e => e.DiaChiLapDat)
+                .HasMaxLength(150)
+                .HasColumnName("DIA_CHI_LAP_DAT");
+            entity.Property(e => e.GhiChu)
+                .HasMaxLength(100)
+                .HasColumnName("GHI_CHU");
+            entity.Property(e => e.GhiChuLyDoKetThuc)
+                .HasMaxLength(130)
+                .HasColumnName("GHI_CHU_LY_DO_KET_THUC");
+            entity.Property(e => e.IdBangNguonTt)
+                .HasMaxLength(24)
+                .IsUnicode(false)
+                .HasColumnName("ID_BANG_NGUON_TT");
+            entity.Property(e => e.LogDate)
+                .HasColumnType("DATE")
+                .HasColumnName("LOG_DATE");
+            entity.Property(e => e.LogUser)
+                .HasMaxLength(15)
+                .IsUnicode(false)
+                .HasColumnName("LOG_USER");
+            entity.Property(e => e.MaKhachHang)
+                .HasMaxLength(9)
+                .IsUnicode(false)
+                .HasColumnName("MA_KHACH_HANG");
+            entity.Property(e => e.MaLyDoKetThuc)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .HasColumnName("MA_LY_DO_KET_THUC");
+            entity.Property(e => e.MaNguonTt)
+                .HasMaxLength(5)
+                .IsUnicode(false)
+                .HasColumnName("MA_NGUON_TT");
+            entity.Property(e => e.MaNhomYc)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .HasColumnName("MA_NHOM_YC");
+            entity.Property(e => e.MaTrangThaiHs)
+                .HasMaxLength(4)
+                .IsUnicode(false)
+                .HasColumnName("MA_TRANG_THAI_HS");
+            entity.Property(e => e.MaXiNghiep)
+                .HasMaxLength(3)
+                .IsUnicode(false)
+                .HasColumnName("MA_XI_NGHIEP");
+            entity.Property(e => e.NgayChuyenXiNghiep)
+                .HasColumnType("DATE")
+                .HasColumnName("NGAY_CHUYEN_XI_NGHIEP");
+            entity.Property(e => e.NoiDungYeuCau)
+                .HasMaxLength(250)
+                .HasColumnName("NOI_DUNG_YEU_CAU");
+            entity.Property(e => e.SoDienThoai)
+                .HasMaxLength(12)
+                .IsUnicode(false)
+                .HasColumnName("SO_DIEN_THOAI");
+            entity.Property(e => e.TenKhachHang)
+                .HasMaxLength(120)
+                .HasColumnName("TEN_KHACH_HANG");
+            entity.Property(e => e.TenLyDoKetThuc)
+                .HasMaxLength(60)
+                .HasColumnName("TEN_LY_DO_KET_THUC");
+            entity.Property(e => e.TenNguonTt)
+                .HasMaxLength(30)
+                .HasColumnName("TEN_NGUON_TT");
+            entity.Property(e => e.TenTrangThaiHs)
+                .HasMaxLength(80)
+                .HasColumnName("TEN_TRANG_THAI_HS");
+            entity.Property(e => e.UsrChuyenXiNghiep)
+                .HasMaxLength(15)
+                .IsUnicode(false)
+                .HasColumnName("USR_CHUYEN_XI_NGHIEP");
+        });
+
+        modelBuilder.Entity<Web0899DmNguonTt>(entity =>
+        {
+            entity.HasKey(e => e.MaNguonTt).HasName("WEB_0899_DM_NGUON_TT_PK");
+
+            entity.ToTable("WEB_0899_DM_NGUON_TT");
+
+            entity.Property(e => e.MaNguonTt)
+                .HasMaxLength(5)
+                .IsUnicode(false)
+                .HasColumnName("MA_NGUON_TT");
+            entity.Property(e => e.KyHieuNhanBiet)
+                .HasMaxLength(15)
+                .IsUnicode(false)
+                .HasColumnName("KY_HIEU_NHAN_BIET");
+            entity.Property(e => e.MaNhomYc)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .HasColumnName("MA_NHOM_YC");
+            entity.Property(e => e.NgayCapNhat)
+                .HasColumnType("DATE")
+                .HasColumnName("NGAY_CAP_NHAT");
+            entity.Property(e => e.NguoiCapNhat)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasColumnName("NGUOI_CAP_NHAT");
+            entity.Property(e => e.Stt)
+                .HasColumnType("NUMBER")
+                .HasColumnName("STT");
+            entity.Property(e => e.TenNguonTt)
+                .HasMaxLength(50)
+                .HasColumnName("TEN_NGUON_TT");
+        });
+
+        modelBuilder.Entity<WebDmTrangThaiHsOb>(entity =>
+        {
+            entity.HasKey(e => e.MaTrangThaiHs).HasName("WEB_DM_TRANG_THAI_HS_OB_PK");
+
+            entity.ToTable("WEB_DM_TRANG_THAI_HS_OB");
+
+            entity.Property(e => e.MaTrangThaiHs)
+                .HasMaxLength(4)
+                .IsUnicode(false)
+                .HasColumnName("MA_TRANG_THAI_HS");
+            entity.Property(e => e.HienThi)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .HasColumnName("HIEN_THI");
+            entity.Property(e => e.Loai)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .HasColumnName("LOAI");
+            entity.Property(e => e.Stt)
+                .HasColumnType("NUMBER")
+                .HasColumnName("STT");
+            entity.Property(e => e.TenSub)
+                .HasMaxLength(80)
+                .HasColumnName("TEN_SUB");
+            entity.Property(e => e.TenSub2)
+                .HasMaxLength(80)
+                .HasColumnName("TEN_SUB_2");
+            entity.Property(e => e.TenTrangThaiHs)
+                .HasMaxLength(80)
+                .HasColumnName("TEN_TRANG_THAI_HS");
+        });
+
+        modelBuilder.Entity<WebDmTrangThaiHsYcc>(entity =>
+        {
+            entity.HasKey(e => e.MaTrangThaiHs).HasName("WEB_DM_TRANG_THAI_HS_YCC_PK");
+
+            entity.ToTable("WEB_DM_TRANG_THAI_HS_YCC");
+
+            entity.Property(e => e.MaTrangThaiHs)
+                .HasMaxLength(4)
+                .IsUnicode(false)
+                .HasColumnName("MA_TRANG_THAI_HS");
+            entity.Property(e => e.HienThi)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .HasColumnName("HIEN_THI");
+            entity.Property(e => e.Loai)
+                .HasMaxLength(1)
+                .IsUnicode(false)
+                .HasColumnName("LOAI");
+            entity.Property(e => e.MaTrangThaiCallcenter)
+                .HasMaxLength(3)
+                .IsUnicode(false)
+                .HasColumnName("MA_TRANG_THAI_CALLCENTER");
+            entity.Property(e => e.Stt)
+                .HasColumnType("NUMBER")
+                .HasColumnName("STT");
+            entity.Property(e => e.TenSub)
+                .HasMaxLength(80)
+                .HasColumnName("TEN_SUB");
+            entity.Property(e => e.TenSub2)
+                .HasMaxLength(80)
+                .HasColumnName("TEN_SUB_2");
+            entity.Property(e => e.TenTrangThaiHs)
+                .HasMaxLength(80)
+                .HasColumnName("TEN_TRANG_THAI_HS");
         });
         modelBuilder.HasSequence("APP_DH_HE_SO_SEQ");
         modelBuilder.HasSequence("CC_LOG_ERR_SEQ");

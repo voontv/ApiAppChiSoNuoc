@@ -178,4 +178,6 @@ public partial class CongNo
     public string? MaBienDoc { get; set; }
 
     public string? MaTraCuu { get; set; }
+
+    public string? BankTransId { get; set; }
 }

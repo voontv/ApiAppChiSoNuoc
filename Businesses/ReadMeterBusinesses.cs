@@ -511,6 +511,20 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
         string? customerCode, string? bookCode, string? month, string? branch, string? meterReader,
         CancellationToken cancellationToken)
     {
+        var affectedRows = await SaveMeterReadingCore(
+            id, status, rollover, readingType, readingDate, currentReading, actualUsage, totalUsage,
+            accumulatedReading, lowUsage, noteCode, note, location, customerCode, bookCode, month,
+            branch, meterReader, cancellationToken);
+        return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- D\u1eef li\u1ec7u kh\u00f4ng t\u00ecm th\u1ea5y." : "00- OK" } });
+    }
+
+    private async Task<int> SaveMeterReadingCore(
+        string? id, string? status, string? rollover, string? readingType, string? readingDate,
+        string? currentReading, string? actualUsage, string? totalUsage, string? accumulatedReading,
+        string? lowUsage, string? noteCode, string? note, string? location,
+        string? customerCode, string? bookCode, string? month, string? branch, string? meterReader,
+        CancellationToken cancellationToken)
+    {
         static decimal FastNumber(string? value) => decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var number) ? number : 0;
         var parsedReadingDate = DateTime.TryParseExact(
             readingDate,
@@ -572,9 +586,189 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
         AddOptionalFilter(sql, parameters, "THANG", "month", month);
         AddOptionalFilter(sql, parameters, "MA_CHI_NHANH", "branch", branch);
 
-        var affectedRows = await ExecuteNonQueryAsync(sql.ToString(), parameters, cancellationToken);
-        return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- Dữ liệu không tìm thấy." : "00- OK" } });
+        return await ExecuteNonQueryAsync(sql.ToString(), parameters, cancellationToken);
 
+    }
+
+    private async Task CreateWebCustomerRequestAsync(
+        string? sourceId, string? customerCode, string? customerName, string? installationAddress,
+        string? phoneNumber, string? branch, string? requestContent, CancellationToken cancellationToken)
+    {
+        const string statusCode = "B010";
+        const string sourceCode = "BDOC";
+
+        var statusName = await _context.WebDmTrangThaiHsYccs.AsNoTracking()
+            .Where(x => x.MaTrangThaiHs == statusCode)
+            .Select(x => x.TenTrangThaiHs)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var source = await _context.Web0899DmNguonTts.AsNoTracking()
+            .Where(x => x.MaNguonTt == sourceCode)
+            .Select(x => new { x.TenNguonTt, x.MaNhomYc })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        _context.Web0800PhieuYeuCauChungs.Add(new Web0800PhieuYeuCauChung
+        {
+            IdPhieuYeuCauChung = await NextNumericIdAsync("WEB_0800_PHIEU_YEU_CAU_CHUNG", "ID_PHIEU_YEU_CAU_CHUNG", 9, cancellationToken),
+            IdBangNguonTt = sourceId,
+            MaKhachHang = customerCode,
+            TenKhachHang = customerName?.ToUpperInvariant(),
+            DiaChiLapDat = installationAddress,
+            SoDienThoai = phoneNumber,
+            MaXiNghiep = branch,
+            NoiDungYeuCau = requestContent,
+            MaTrangThaiHs = statusCode,
+            TenTrangThaiHs = statusName,
+            MaNguonTt = sourceCode,
+            TenNguonTt = source?.TenNguonTt,
+            MaNhomYc = source?.MaNhomYc,
+            LogUser = "BDOC_Auto",
+            LogDate = DateTime.Now
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task SaveInfoToCallCenterAsync(
+        string requestType, string handlingUnit, string? registrationId, string? customerCode,
+        string? customerName, string? customerAddress, string? installationAddress, string? email,
+        string? phoneNumber, string? ward, string? branch, string? note, string updater,
+        string sourceCode, CancellationToken cancellationToken)
+    {
+        var requestId = await NextNumericIdAsync("CC_01_TTKH_YEU_CAU", "ID_YEU_CAU", 9, cancellationToken);
+        await ExecuteNonQueryAsync("""
+            INSERT INTO CC_01_TTKH_YEU_CAU (
+                ID_YEU_CAU,
+                MA_KHACH_HANG,
+                ID_DANG_KY,
+                MA_NGUON_TT,
+                TEN_KHACH_HANG,
+                TEN_KHACH_HANG_SUB,
+                DIA_CHI_DONG_HO,
+                CC_SO_DIEN_THOAI,
+                MA_NOI_DUNG_YC,
+                MA_XI_NGHIEP,
+                MA_PHUONG,
+                CC_EMAIL,
+                GHI_CHU,
+                LINK_GHI_AM,
+                XU_LY_MA_BO_PHAN,
+                XU_LY_MA_TRANG_THAI,
+                CONG_VIEC_24G,
+                KHACH_HANG_YC,
+                KHACH_HANG_YC_LAN,
+                NHAN_VIEN_YC,
+                NHAN_VIEN_YC_LAN,
+                TT_UU_TIEN_CV,
+                NGUOI_CAP_NHAT,
+                NGAY_CAP_NHAT
+            ) VALUES (
+                :id,
+                :customerCode,
+                :registrationId,
+                :sourceCode,
+                :customerName,
+                :customerNameSub,
+                :installationAddress,
+                :phoneNumber,
+                :requestType,
+                :branch,
+                :ward,
+                :email,
+                :note,
+                '',
+                :handlingUnit,
+                '01',
+                'N',
+                'Y',
+                1,
+                'N',
+                0,
+                4,
+                :updater,
+                SYSDATE
+            )
+            """, new[]
+        {
+            Param("id", requestId),
+            Param("customerCode", customerCode),
+            Param("registrationId", registrationId),
+            Param("sourceCode", sourceCode),
+            NParam("customerName", customerName),
+            NParam("customerNameSub", $"{customerName} [{customerAddress}]"),
+            NParam("installationAddress", installationAddress),
+            Param("phoneNumber", phoneNumber),
+            Param("requestType", requestType),
+            Param("branch", branch),
+            Param("ward", ward),
+            Param("email", string.IsNullOrWhiteSpace(email) ? null : email),
+            NParam("note", note),
+            Param("handlingUnit", handlingUnit),
+            Param("updater", updater)
+        }, cancellationToken);
+
+    }
+
+    private async Task ForwardCustomerRequestToWorkQueuesAsync(
+        string? sourceId, string? customerCode, string? customerName, string? address,
+        string? phone, string? branch, string? content, CancellationToken cancellationToken)
+    {
+        await CreateWebCustomerRequestAsync(sourceId, customerCode, customerName, address, phone, branch, content, cancellationToken);
+        await SaveInfoToCallCenterAsync(
+            "035", "02", sourceId, customerCode, customerName, address, address, null, phone, null,
+            branch, content, "app_biendoc", "BDOC", cancellationToken);
+    }
+
+    private async Task ForwardMeterReadingNoteIfNeededAsync(
+        string? meterId, string? customerCode, string? noteCode, string? note,
+        string? branch, string? meterReader, CancellationToken cancellationToken)
+    {
+        noteCode = noteCode?.Trim();
+        if (string.IsNullOrWhiteSpace(noteCode) || noteCode == "00")
+            return;
+
+        var noteInfo = await _context.AppDhDmGhiChus.AsNoTracking()
+            .Where(x => x.MaGhiChu == noteCode)
+            .Select(x => new { x.DenKiemTra, x.NoiDungGhiChu })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (noteInfo?.DenKiemTra?.Trim() != "1")
+            return;
+
+        if (string.IsNullOrWhiteSpace(customerCode) || string.IsNullOrWhiteSpace(branch))
+        {
+            var reading = await _context.AppDhChiSos.AsNoTracking()
+                .Where(x => x.IdDcs == meterId && x.MaBienDoc == meterReader)
+                .Select(x => new { x.MaKhachHang, x.MaChiNhanh })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            customerCode = string.IsNullOrWhiteSpace(customerCode) ? reading?.MaKhachHang : customerCode;
+            branch = string.IsNullOrWhiteSpace(branch) ? reading?.MaChiNhanh : branch;
+        }
+
+        var customer = await _context.ThongTinKhs.AsNoTracking()
+            .Where(x => x.NgayThanhLyHd == null && x.MaKhachHang == customerCode)
+            .Select(x => new { x.TenKhachHang, x.DiaChiDongHo, x.PhoneUt1 })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (customer is null)
+            return;
+
+        var readerName = await _context.DmNhanViens.AsNoTracking()
+            .Where(x => x.MaNhanVien == meterReader)
+            .Select(x => x.TenNhanVien)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var requestContent = $"{noteInfo.NoiDungGhiChu} ({readerName ?? meterReader}) - {note}";
+        await ForwardCustomerRequestToWorkQueuesAsync(
+            meterId,
+            customerCode,
+            customer.TenKhachHang,
+            customer.DiaChiDongHo,
+            customer.PhoneUt1,
+            branch,
+            requestContent,
+            cancellationToken);
     }
 
     public Task<ContentResult> P_00_KET_NOI_DB_CHECK(string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
@@ -841,8 +1035,21 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
         });
     }
 
-    public Task<ContentResult> P_041_NHAP_XUAT_CS_LE_ONLINE(string? ID_DONG_HO, string? MA_TINH_TRANG_DH, string? QUA_VONG, string? LOAI_CHI_SO, string? NGAY_DOC_CS, string? CHI_SO_MOI, string? SAN_LUONG_TT, string? TONG_SL, string? CONG_CHI_SO, string? SAN_LUONG_DUNG_IT, string? MA_GHI_CHU, string? GHI_CHU, string? VI_TRI_DOC, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        SaveMeterReading(ID_DONG_HO, MA_TINH_TRANG_DH, QUA_VONG, LOAI_CHI_SO, NGAY_DOC_CS, CHI_SO_MOI, SAN_LUONG_TT, TONG_SL, CONG_CHI_SO, SAN_LUONG_DUNG_IT, MA_GHI_CHU, GHI_CHU, VI_TRI_DOC, null, null, null, null, MA_BIEN_DOC, cancellationToken);
+    public async Task<ContentResult> P_041_NHAP_XUAT_CS_LE_ONLINE(string? ID_DONG_HO, string? MA_TINH_TRANG_DH, string? QUA_VONG, string? LOAI_CHI_SO, string? NGAY_DOC_CS, string? CHI_SO_MOI, string? SAN_LUONG_TT, string? TONG_SL, string? CONG_CHI_SO, string? SAN_LUONG_DUNG_IT, string? MA_GHI_CHU, string? GHI_CHU, string? VI_TRI_DOC, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    {
+        var affectedRows = await SaveMeterReadingCore(
+            ID_DONG_HO, MA_TINH_TRANG_DH, QUA_VONG, LOAI_CHI_SO, NGAY_DOC_CS, CHI_SO_MOI,
+            SAN_LUONG_TT, TONG_SL, CONG_CHI_SO, SAN_LUONG_DUNG_IT, MA_GHI_CHU, GHI_CHU,
+            VI_TRI_DOC, null, null, null, null, MA_BIEN_DOC, cancellationToken);
+
+        if (affectedRows == 0)
+            return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        await ForwardMeterReadingNoteIfNeededAsync(
+            ID_DONG_HO, null, MA_GHI_CHU, GHI_CHU, null, MA_BIEN_DOC, cancellationToken);
+
+        return JsonObject(new[] { new { ROOT = "00- OK" } });
+    }
 
     public async Task<ContentResult> P_045_CANH_BAO_SAN_LUONG_LON(
     string? ID_DONG_HO,
@@ -1053,8 +1260,23 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
         return JsonObject(new[] { new { ROOT = "00- OK" } });
     }
 
-    public Task<ContentResult> P_041_NHAP_XUAT_CS_LE_ONLINE_SUB(string? ID_DONG_HO, string? MA_TINH_TRANG_DH, string? QUA_VONG, string? LOAI_CHI_SO, string? NGAY_DOC_CS, string? CHI_SO_MOI, string? SAN_LUONG_TT, string? TONG_SL, string? CONG_CHI_SO, string? SAN_LUONG_DUNG_IT, string? MA_GHI_CHU, string? GHI_CHU, string? VI_TRI_DOC, string? MA_KHACH_HANG, string? MA_SO_DOC, string? THANG, string? MA_XI_NGHIEP, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
-        SaveMeterReading(ID_DONG_HO, MA_TINH_TRANG_DH, QUA_VONG, LOAI_CHI_SO, NGAY_DOC_CS, CHI_SO_MOI, SAN_LUONG_TT, TONG_SL, CONG_CHI_SO, SAN_LUONG_DUNG_IT, MA_GHI_CHU, GHI_CHU, VI_TRI_DOC, MA_KHACH_HANG, MA_SO_DOC, THANG, MA_XI_NGHIEP, MA_BIEN_DOC, cancellationToken);
+    public async Task<ContentResult> P_041_NHAP_XUAT_CS_LE_ONLINE_SUB(string? ID_DONG_HO, string? MA_TINH_TRANG_DH, string? QUA_VONG, string? LOAI_CHI_SO, string? NGAY_DOC_CS, string? CHI_SO_MOI, string? SAN_LUONG_TT, string? TONG_SL, string? CONG_CHI_SO, string? SAN_LUONG_DUNG_IT, string? MA_GHI_CHU, string? GHI_CHU, string? VI_TRI_DOC, string? MA_KHACH_HANG, string? MA_SO_DOC, string? THANG, string? MA_XI_NGHIEP, string? MA_BIEN_DOC, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    {
+        var affectedRows = await SaveMeterReadingCore(
+            ID_DONG_HO, MA_TINH_TRANG_DH, QUA_VONG, LOAI_CHI_SO, NGAY_DOC_CS, CHI_SO_MOI,
+            SAN_LUONG_TT, TONG_SL, CONG_CHI_SO, SAN_LUONG_DUNG_IT, MA_GHI_CHU, GHI_CHU,
+            VI_TRI_DOC, MA_KHACH_HANG, MA_SO_DOC, THANG, MA_XI_NGHIEP, MA_BIEN_DOC,
+            cancellationToken);
+
+        if (affectedRows == 0)
+            return JsonObject(new[] { new { ROOT = "16- Dá»¯ liá»‡u khÃ´ng tÃ¬m tháº¥y." } });
+
+        await ForwardMeterReadingNoteIfNeededAsync(
+            ID_DONG_HO, MA_KHACH_HANG, MA_GHI_CHU, GHI_CHU, MA_XI_NGHIEP, MA_BIEN_DOC,
+            cancellationToken);
+
+        return JsonObject(new[] { new { ROOT = "00- OK" } });
+    }
 
     public async Task<ContentResult> P_051_KIEM_TRA_BAN_GIAO_SD(string? MA_SO_DOC, string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? THANG, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
@@ -3405,6 +3627,16 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
             Param("customerRequested", customerRequested),
             Param("employeeRequested", employeeRequested)
         }, cancellationToken);
+
+        await ForwardCustomerRequestToWorkQueuesAsync(
+            requestId,
+            r.MA_KHACH_HANG,
+            r.TEN_KHACH_HANG,
+            r.DIA_CHI_KHACH_HANG,
+            r.SO_DIEN_THOAI_KH,
+            r.MA_XI_NGHIEP,
+            r.NOI_DUNG_YEU_CAU,
+            cancellationToken);
 
         return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- Dữ liệu không tìm thấy." : "00- OK" } });
     }
