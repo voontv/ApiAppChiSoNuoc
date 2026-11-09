@@ -67,6 +67,12 @@ public interface IReadMeterBusinesses
     Task<ContentResult> A_011_CHECKIN_DS_KH_CAT_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> A_012_CHECKIN_DS_KH_MO_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> A_013_CHECKIN_DS_KH_GUI_GB(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_014_CHECKIN_TT_KH_CAT_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_014_CHECKIN_TT_KH_CAT_NUOC_V2(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_015_CHECKIN_TT_KH_MO_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_015_CHECKIN_TT_KH_MO_NUOC_V2(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_016_CHECKIN_TT_KH_GUI_GB(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
+    Task<ContentResult> A_016_CHECKIN_TT_KH_GUI_GB_V2(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> A_99_CHECKIN_DM_KIEU_CAT(string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> A_02_CHECKIN_LUU_KH_CAT_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? NGUOI_THI_CONG, string? MA_KIEU_CAT_MO, string? NGAY_HOAN_THANH, string? VI_TRI_XAC_NHAN, string? MA_GHI_CHU, string? GHI_CHU, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> A_03_CHECKIN_LUU_KH_MO_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? NGUOI_THI_CONG, string? MA_KIEU_CAT_MO, string? NGAY_HOAN_THANH, string? VI_TRI_XAC_NHAN, string? MA_GHI_CHU, string? GHI_CHU, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
@@ -299,58 +305,21 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
         TraCuu
     }
 
-    private sealed class CustomerReadingProjection
-    {
-        public string ROOT { get; set; } = "00- OK";
-        public string? ID_DONG_HO { get; set; }
-        public string? MA_KHACH_HANG { get; set; }
-        public string? TEN_KHACH_HANG { get; set; }
-        public string? DIA_CHI_DONG_HO { get; set; }
-        public string? TEN_DONG_HO { get; set; }
-        public string? CO_DH { get; set; }
-        public string? HT_KD { get; set; }
-        public string? SO_SERIAL_DONG_HO { get; set; }
-        public string? PHONE_UT1 { get; set; }
-        public string? EMAIL_UT1 { get; set; }
-        public string? MA_GIA { get; set; }
-        public string? SO_O_CUA_SO { get; set; }
-        public decimal? CHI_SO_CU { get; set; }
-        public decimal? CHI_SO_MOI { get; set; }
-        public decimal? SAN_LUONG_TT { get; set; }
-        public decimal? TONG_SL { get; set; }
-        public string? MA_TINH_TRANG_DH { get; set; }
-        public decimal? STT_SO_DOC { get; set; }
-        public decimal? STT_SO_DOC_MOI { get; set; }
-        public DateTime? NGAY_DOC_DK { get; set; }
-        public DateTime? NGAY_DOC_CS { get; set; }
-        public DateTime? NGAY_DOC_TUNG_DH { get; set; }
-        public string? QUA_VONG { get; set; }
-        public string? LOAI_CHI_SO { get; set; }
-        public decimal? CONG_CHI_SO { get; set; }
-        public decimal? SAN_LUONG_DUNG_IT { get; set; }
-        public string? MA_GHI_CHU { get; set; }
-        public string? GHI_CHU { get; set; }
-        public string? VI_TRI_DOC { get; set; }
-        public string? VI_TRI_DOC_CU { get; set; }
-        public string? TEN_FILE_ANH { get; set; }
-        public decimal? SL_TB_3THANG { get; set; }
-    }
-
-    private static IQueryable<CustomerReadingProjection> OrderCustomerReading(IQueryable<CustomerReadingProjection> query, string? sortBy)
+    private static string GetCustomerReadingOrderBy(string? sortBy)
     {
         if (string.IsNullOrWhiteSpace(sortBy))
-            return query.OrderBy(x => x.STT_SO_DOC);
+            return "cs.STT_SO_DOC";
 
         return sortBy.Trim().ToUpperInvariant() switch
         {
-            "STT_SO_DOC" => query.OrderBy(x => x.STT_SO_DOC),
-            "STT_SO_DOC_MOI" => query.OrderBy(x => x.STT_SO_DOC_MOI),
-            "MA_KHACH_HANG" => query.OrderBy(x => x.MA_KHACH_HANG),
-            "TEN_KHACH_HANG" => query.OrderBy(x => x.TEN_KHACH_HANG),
-            "DIA_CHI_DONG_HO" => query.OrderBy(x => x.DIA_CHI_DONG_HO),
-            "NGAY_DOC_DK" => query.OrderBy(x => x.NGAY_DOC_DK),
-            "NGAY_DOC_CS" => query.OrderBy(x => x.NGAY_DOC_CS),
-            _ => query.OrderBy(x => x.STT_SO_DOC)
+            "STT_SO_DOC" => "cs.STT_SO_DOC",
+            "STT_SO_DOC_MOI" => "cs.STT_SO_DOC_MOI",
+            "MA_KHACH_HANG" => "cs.MA_KHACH_HANG",
+            "TEN_KHACH_HANG" => "kh.TEN_KHACH_HANG",
+            "DIA_CHI_DONG_HO" => "kh.DIA_CHI_DONG_HO",
+            "NGAY_DOC_DK" => "cs.NGAY_DOC_DK",
+            "NGAY_DOC_CS" => "cs.NGAY_DOC_CS",
+            _ => "cs.STT_SO_DOC"
         };
     }
 
@@ -359,151 +328,152 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
         string? phone, string? bookCode, string? meterReader, string? month, string? filter,
         string? sortBy, CustomerReadingMode mode, CancellationToken cancellationToken)
     {
+        var where = new StringBuilder();
+        var parameters = new List<OracleParameter>();
+
         var isNormalOrSub = mode is CustomerReadingMode.Normal or CustomerReadingMode.Sub;
         var isSubBs = mode == CustomerReadingMode.SubBs;
-        var query =
-            from reading in _context.AppDhChiSos.AsNoTracking()
-            join customerJoin in _context.ThongTinKhs.AsNoTracking()
-                on reading.MaKhachHang equals customerJoin.MaKhachHang into customers
-            from customer in customers.DefaultIfEmpty()
-            select new { reading, customer };
+        var isTraCuu = mode == CustomerReadingMode.TraCuu;
 
+        // Giữ đúng VB cũ cho P_03 / P_03_SUB / P_03_SUB_BS:
+        // nếu có ID thì lọc ID_DCS + MA_SO_DOC, không ép MA_BIEN_DOC/THANG.
         if (!string.IsNullOrWhiteSpace(id))
         {
-            query = query.Where(x =>
-                x.reading.IdDcs == id &&
-                x.reading.MaSoDoc == bookCode);
+            where.AppendLine("WHERE cs.ID_DCS = :id");
+            where.AppendLine("  AND cs.MA_SO_DOC = :bookCode");
+            parameters.Add(Param("id", id));
+            parameters.Add(Param("bookCode", bookCode));
         }
         else
         {
-            query = query.Where(x =>
-                x.reading.MaSoDoc == bookCode &&
-                x.reading.MaBienDoc == meterReader &&
-                x.reading.Thang == month);
+            where.AppendLine("""
+                WHERE cs.MA_SO_DOC = :bookCode
+                  AND cs.MA_BIEN_DOC = :meterReader
+                  AND cs.THANG = :month
+                """);
+            parameters.Add(Param("bookCode", bookCode));
+            parameters.Add(Param("meterReader", meterReader));
+            parameters.Add(Param("month", month));
 
+            // P_03 và P_03_SUB có 3 điều kiện này trong VB cũ.
+            // P_03_SUB_BS đã comment 3 điều kiện này.
+            // P_0313 giữ nguyên kiểu tra cứu hiện tại: không áp 3 điều kiện khóa.
             if (isNormalOrSub)
             {
-                query = query.Where(x =>
-                    x.reading.NgayEbillNhanKhoa == null &&
-                    x.reading.NgayEbillNapBill == null &&
-                    x.reading.NgayBdNhanKhoa != null);
+                where.AppendLine("  AND cs.NGAY_EBILL_NHAN_KHOA IS NULL");
+                where.AppendLine("  AND cs.NGAY_EBILL_NAP_BILL IS NULL");
+                where.AppendLine("  AND cs.NGAY_BD_NHAN_KHOA IS NOT NULL");
             }
         }
 
         if (decimal.TryParse(sequence, out var rawSequenceValue))
-            query = query.Where(x => x.reading.SttSoDoc == rawSequenceValue);
+        {
+            where.AppendLine("  AND cs.STT_SO_DOC = :sequence");
+            parameters.Add(Param("sequence", rawSequenceValue));
+        }
 
+        // VB cũ: P_03 và P_03_SUB có KIEU_LOC.
+        // P_03_SUB_BS đã comment toàn bộ KIEU_LOC.
         if (isNormalOrSub)
         {
             if (filter == "1")
-                query = query.Where(x => x.reading.NgayDocTungDh != null);
+                where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NOT NULL");
             else if (filter == "2")
-                query = query.Where(x => x.reading.NgayDocTungDh == null);
+                where.AppendLine("  AND cs.NGAY_DOC_TUNG_DH IS NULL");
         }
 
+        // P_03_SUB_BS luôn chỉ lấy mã tình trạng BS.
         if (isSubBs)
-            query = query.Where(x => x.reading.MaTinhTrangDh == "BS");
+            where.AppendLine("  AND cs.MA_TINH_TRANG_DH = 'BS'");
 
+        // VB cũ dùng so sánh chính xác MA_KHACH_HANG, không dùng LIKE.
         if (!string.IsNullOrWhiteSpace(customerCode))
-            query = query.Where(x => x.reading.MaKhachHang == customerCode);
+        {
+            where.AppendLine("  AND cs.MA_KHACH_HANG = :customerCode");
+            parameters.Add(Param("customerCode", customerCode));
+        }
 
         if (!string.IsNullOrWhiteSpace(customerName))
-            query = query.Where(x => EF.Functions.Like(x.customer.TenKhachHang!, $"%{customerName}%"));
+        {
+            where.AppendLine("  AND UPPER(kh.TEN_KHACH_HANG) LIKE UPPER(:customerName)");
+            parameters.Add(NParam("customerName", $"%{customerName}%"));
+        }
 
         if (!string.IsNullOrWhiteSpace(address))
-            query = query.Where(x => EF.Functions.Like(x.customer.DiaChiDongHo!, $"%{address}%"));
+        {
+            where.AppendLine("  AND UPPER(kh.DIA_CHI_DONG_HO) LIKE UPPER(:address)");
+            parameters.Add(NParam("address", $"%{address}%"));
+        }
 
         if (!string.IsNullOrWhiteSpace(phone))
-            query = query.Where(x => EF.Functions.Like(x.customer.PhoneUt1!, $"%{phone}%"));
-
-        query = query.Where(x => x.customer.NgayThanhLyHd == null);
-
-        var projectedQuery = query.Select(x => new CustomerReadingProjection
         {
-            ID_DONG_HO = x.reading.IdDcs,
-            MA_KHACH_HANG = x.customer.MaKhachHang,
-            TEN_KHACH_HANG = x.customer.TenKhachHang,
-            DIA_CHI_DONG_HO = x.customer.DiaChiDongHo,
-            TEN_DONG_HO = x.customer.TenDongHo,
-            CO_DH = x.customer.MaDongHo,
-            HT_KD = x.customer.HtKd,
-            SO_SERIAL_DONG_HO = x.customer.SoSerialDongHo,
-            PHONE_UT1 = x.customer.PhoneUt1,
-            EMAIL_UT1 = x.customer.EmailUt1,
-            MA_GIA = x.customer.MaGia,
-            SO_O_CUA_SO = x.customer.SoOCuaSo,
-            CHI_SO_CU = x.reading.ChiSoCu,
-            CHI_SO_MOI = x.reading.ChiSoMoi,
-            SAN_LUONG_TT = x.reading.SanLuongTt,
-            TONG_SL = x.reading.TongSl,
-            MA_TINH_TRANG_DH = x.reading.MaTinhTrangDh,
-            STT_SO_DOC = x.reading.SttSoDoc,
-            STT_SO_DOC_MOI = x.reading.SttSoDocMoi ?? x.reading.SttSoDoc,
-            NGAY_DOC_DK = x.reading.NgayDocDk,
-            NGAY_DOC_CS = x.reading.NgayDocCs,
-            NGAY_DOC_TUNG_DH = x.reading.NgayDocTungDh,
-            QUA_VONG = x.reading.QuaVong,
-            LOAI_CHI_SO = x.reading.LoaiChiSo,
-            CONG_CHI_SO = x.reading.CongChiSo,
-            SAN_LUONG_DUNG_IT = x.reading.SanLuongDungIt,
-            MA_GHI_CHU = x.reading.MaGhiChu,
-            GHI_CHU = x.reading.GhiChu,
-            VI_TRI_DOC = x.reading.ViTriDoc,
-            VI_TRI_DOC_CU = x.reading.ViTriDocCu,
-            TEN_FILE_ANH = x.reading.TenFileAnh,
-            SL_TB_3THANG = x.reading.SlTb3thang
-        });
+            where.AppendLine("  AND kh.PHONE_UT1 LIKE :phone");
+            parameters.Add(Param("phone", $"%{phone}%"));
+        }
 
-        projectedQuery = OrderCustomerReading(projectedQuery, sortBy);
+        // Ba hàm P_03 cũ dùng RIGHT OUTER JOIN từ THONG_TIN_KH sang APP_DH_CHI_SO,
+        // tương đương APP_DH_CHI_SO LEFT JOIN THONG_TIN_KH.
+        // Riêng P_0313 chưa có source VB trong phần đối chiếu nên giữ JOIN hiện tại.
+        var joinClause = isTraCuu
+            ? "JOIN THONG_TIN_KH kh ON kh.MA_KHACH_HANG = cs.MA_KHACH_HANG"
+            : "LEFT JOIN THONG_TIN_KH kh ON kh.MA_KHACH_HANG = cs.MA_KHACH_HANG";
 
-        var data = await projectedQuery.ToListAsync(cancellationToken);
-        var rows = data
-            .Select(x => new
-            {
-                x.ROOT,
-                x.ID_DONG_HO,
-                x.MA_KHACH_HANG,
-                x.TEN_KHACH_HANG,
-                x.DIA_CHI_DONG_HO,
-                x.TEN_DONG_HO,
-                x.CO_DH,
-                x.HT_KD,
-                x.SO_SERIAL_DONG_HO,
-                x.PHONE_UT1,
-                x.EMAIL_UT1,
-                x.MA_GIA,
-                x.SO_O_CUA_SO,
-                x.CHI_SO_CU,
-                x.CHI_SO_MOI,
-                x.SAN_LUONG_TT,
-                x.TONG_SL,
-                x.MA_TINH_TRANG_DH,
-                x.STT_SO_DOC,
-                x.STT_SO_DOC_MOI,
-                x.NGAY_DOC_DK,
-                NGAY_DOC_CS = x.NGAY_DOC_CS.HasValue
-                    ? x.NGAY_DOC_CS.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
-                    : string.Empty,
-                x.NGAY_DOC_TUNG_DH,
-                TINH_TRANG_CS = x.NGAY_DOC_TUNG_DH.HasValue ? "\u0110\u00e3 ghi" : "Ch\u01b0a ghi",
-                x.QUA_VONG,
-                x.LOAI_CHI_SO,
-                x.CONG_CHI_SO,
-                x.SAN_LUONG_DUNG_IT,
-                x.MA_GHI_CHU,
-                x.GHI_CHU,
-                x.VI_TRI_DOC,
-                x.VI_TRI_DOC_CU,
-                x.TEN_FILE_ANH,
-                x.SL_TB_3THANG
-            })
-            .ToList();
+        // Ba hàm P_03 cũ dùng SAP_XEP_THEO, mặc định STT_SO_DOC.
+        // P_0313 giữ nguyên thứ tự hiện tại vì chưa có hàm VB gốc để đối chiếu.
+        var orderBy = isTraCuu
+            ? "NVL(cs.STT_SO_DOC_MOI, cs.STT_SO_DOC)"
+            : GetCustomerReadingOrderBy(sortBy);
+
+        // PHẦN SELECT/RESPONSE GIỮ NGUYÊN như file hiện tại để không thay đổi dữ liệu trả client.
+        var rows = await QueryRowsAsync($"""
+            SELECT
+                '00- OK' ROOT,
+                cs.ID_DCS ID_DONG_HO,
+                kh.MA_KHACH_HANG,
+                kh.TEN_KHACH_HANG,
+                kh.DIA_CHI_DONG_HO,
+                kh.TEN_DONG_HO,
+                kh.MA_DONG_HO CO_DH,
+                kh.HT_KD,
+                kh.SO_SERIAL_DONG_HO,
+                kh.PHONE_UT1,
+                kh.EMAIL_UT1,
+                kh.MA_GIA,
+                kh.SO_O_CUA_SO,
+                cs.CHI_SO_CU,
+                cs.CHI_SO_MOI,
+                cs.SAN_LUONG_TT,
+                cs.TONG_SL,
+                cs.MA_TINH_TRANG_DH,
+                cs.STT_SO_DOC,
+                cs.STT_SO_DOC_MOI,
+                cs.NGAY_DOC_DK,
+                cs.NGAY_DOC_CS,
+                cs.NGAY_DOC_TUNG_DH,
+                CASE WHEN cs.NGAY_DOC_TUNG_DH IS NOT NULL THEN 'Đã ghi' ELSE 'Chưa ghi' END TINH_TRANG_CS,
+                cs.QUA_VONG,
+                cs.LOAI_CHI_SO,
+                cs.CONG_CHI_SO,
+                cs.SAN_LUONG_DUNG_IT,
+                cs.MA_GHI_CHU,
+                cs.GHI_CHU,
+                cs.VI_TRI_DOC,
+                cs.VI_TRI_DOC_CU,
+                cs.TEN_FILE_ANH,
+                cs.SL_TB_3THANG
+            FROM APP_DH_CHI_SO cs
+            {joinClause}
+            {where}
+              AND kh.NGAY_THANH_LY_HD IS NULL
+            ORDER BY {orderBy}
+            """, parameters, cancellationToken);
 
         return JsonObject(rows.Count == 0
-            ? new object[] { new { ROOT = "16- D\u1eef li\u1ec7u kh\u00f4ng t\u00ecm th\u1ea5y. Vui l\u00f2ng ki\u1ec3m tra l\u1ea1i!" } }
+            ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } }
             : rows.Cast<object>());
 
     }
+
     private async Task<ContentResult> SaveMeterReading(
         string? id, string? status, string? rollover, string? readingType, string? readingDate,
         string? currentReading, string? actualUsage, string? totalUsage, string? accumulatedReading,
@@ -515,7 +485,7 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
             id, status, rollover, readingType, readingDate, currentReading, actualUsage, totalUsage,
             accumulatedReading, lowUsage, noteCode, note, location, customerCode, bookCode, month,
             branch, meterReader, cancellationToken);
-        return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- D\u1eef li\u1ec7u kh\u00f4ng t\u00ecm th\u1ea5y." : "00- OK" } });
+        return JsonObject(new[] { new { ROOT = affectedRows == 0 ? "16- Dữ liệu không tìm thấy." : "00- OK" } });
     }
 
     private async Task<int> SaveMeterReadingCore(
@@ -706,7 +676,6 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
             Param("handlingUnit", handlingUnit),
             Param("updater", updater)
         }, cancellationToken);
-
     }
 
     private async Task ForwardCustomerRequestToWorkQueuesAsync(
@@ -1269,7 +1238,7 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
             cancellationToken);
 
         if (affectedRows == 0)
-            return JsonObject(new[] { new { ROOT = "16- Dá»¯ liá»‡u khÃ´ng tÃ¬m tháº¥y." } });
+            return JsonObject(new[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
 
         await ForwardMeterReadingNoteIfNeededAsync(
             ID_DONG_HO, MA_KHACH_HANG, MA_GHI_CHU, GHI_CHU, MA_XI_NGHIEP, MA_BIEN_DOC,
@@ -1982,6 +1951,48 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
             CultureInfo.InvariantCulture);
     }
 
+    private static (DateTime From, DateTime ToExclusive) ParseDmyDateRange(
+        string? from,
+        string? to)
+    {
+        static DateTime ParseDate(string? value)
+        {
+            return DateTime.TryParseExact(
+                value?.Trim(),
+                new[] { "dd/MM/yyyy", "dd/MM/yyyy HH:mm:ss", "yyyy-MM-dd" },
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var date)
+                    ? date.Date
+                    : DateTime.Today;
+        }
+
+        return (
+            ParseDate(from),
+            ParseDate(to).AddDays(1));
+    }
+
+    private static string[]? LayMaXiNghiepMoi(
+        string? maXiNghiep)
+    {
+        return maXiNghiep?.Trim() switch
+        {
+            "011" or "004" or "007" => new[] { "011", "004", "007" },
+            "012" or "008" => new[] { "012", "008" },
+            "013" or "003" or "005" => new[] { "013", "003", "005" },
+            "014" or "006" => new[] { "014", "006" },
+            _ => null
+        };
+    }
+
+    private static string FormatDmy(
+        DateTime? value)
+    {
+        return value.HasValue
+            ? value.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+            : string.Empty;
+    }
+
 
     // ======================================================================
     // KIỂM TRA KHÁCH HÀNG CÓ HÓA ĐƠN ĐIỀU CHỈNH GIẢM KHÔNG
@@ -2360,23 +2371,23 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
     {
         var customerCode = (MA_KHACH_HANG ?? string.Empty).PadLeft(9, '0');
         var catMoNuocRows = await _billing.Aereport
-        .AsNoTracking()
-        .Where(x => x.CUSTID == customerCode)
-        .OrderByDescending(x => x.DATECREATE)
-        .Select(x => new
-        {
-            x.ERPTTYPE,
-            x.ERPTSTS,
-            NGAY_THUC_HIEN = x.DATECREATE,
-            NGUOI_THUC_HIEN = x.EXECUTER,
-            LY_DO = x.RPTREASON,
-            CHI_SO_NIEM = x.READSEAL,
-            CHI_SO_NUOC = x.READCURR,
-            GHI_CHU_1 = x.ERPTCONTENT1,
-            GHI_CHU_2 = x.ERPTCONTENT2,
-            TONG_TIEN_NO = x.TOTAL
-        })
-        .ToListAsync(cancellationToken);
+            .AsNoTracking()
+            .Where(x => x.CUSTID == customerCode)
+            .OrderByDescending(x => x.ERPTID)
+            .Select(x => new
+            {
+                x.ERPTTYPE,
+                x.ERPTSTS,
+                NGAY_THUC_HIEN = x.DATECREATE,
+                NGUOI_THUC_HIEN = x.EXECUTER,
+                LY_DO = x.RPTREASON,
+                CHI_SO_NIEM = x.READSEAL,
+                CHI_SO_NUOC = x.READCURR,
+                GHI_CHU_1 = x.ERPTCONTENT1,
+                GHI_CHU_2 = x.ERPTCONTENT2,
+                TONG_TIEN_NO = x.TOTAL
+            })
+            .ToListAsync(cancellationToken);
 
         object[] response = catMoNuocRows.Count == 0
             ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy. Vui lòng kiểm tra lại!" } }
@@ -2390,14 +2401,13 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
                     : x.ERPTTYPE == "4" ? "Giấy mời ký lại hợp đồng tiêu thụ nước sạch"
                     : x.ERPTTYPE == "5" ? "Điều chỉnh giá tiêu thụ nước sạch" : x.ERPTTYPE,
                 TRANG_THAI = x.ERPTSTS == "1" ? "Đã thực hiện" : x.ERPTSTS == "0" ? "Chưa thực hiện" : x.ERPTSTS,
-                x.NGAY_THUC_HIEN,
+                NGAY_THUC_HIEN = FormatDmy(x.NGAY_THUC_HIEN),
                 x.NGUOI_THUC_HIEN,
-                x.LY_DO,
-                x.CHI_SO_NIEM,
                 x.CHI_SO_NUOC,
-                x.GHI_CHU_1,
-                x.GHI_CHU_2,
-                x.TONG_TIEN_NO
+                x.CHI_SO_NIEM,
+                x.LY_DO,
+                x.TONG_TIEN_NO,
+                GHI_CHU = (x.GHI_CHU_1 ?? string.Empty) + " " + (x.GHI_CHU_2 ?? string.Empty)
             }).Cast<object>().ToArray();
 
         return JsonObject(response);
@@ -3667,32 +3677,393 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
 
     public async Task<ContentResult> A_011_CHECKIN_DS_KH_CAT_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await (from job in _context.AppCheckInCatNuocs.AsNoTracking()
+        var (fromDate, toDate) = ParseDmyDateRange(TU_NGAY, DEN_NGAY);
+        var branches = LayMaXiNghiepMoi(MA_XI_NGHIEP);
+
+        var query = from job in _context.AppCheckInCatNuocs.AsNoTracking()
             join customer in _context.ThongTinKhs.AsNoTracking() on job.MaKhachHang equals customer.MaKhachHang
-            where job.MaNhanVien == MA_NHAN_VIEN && job.MaXiNghiep == MA_XI_NGHIEP
-            orderby job.Stt
-            select new { ROOT = "00- OK", job.IdXacNhan, job.MaKhachHang, customer.TenKhachHang, customer.DiaChiDongHo, SO_DIEN_THOAI = customer.PhoneUt1, job.NgayXnBgNhanVien, job.NgayHoanThanh, job.MaSoDoc, job.TenFileAnh, job.GhiChuXn }).ToListAsync(cancellationToken);
-        return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } } : rows.Cast<object>());
+            where job.MaNhanVien == MA_NHAN_VIEN
+                && job.NgayXnBgNhanVien >= fromDate
+                && job.NgayXnBgNhanVien < toDate
+                && customer.NgayThanhLyHd == null
+            select new
+            {
+                job.IdXacNhan,
+                job.MaKhachHang,
+                job.NgayDoc,
+                job.MaSoDoc,
+                job.NgayXnBgNhanVien,
+                job.NgayHoanThanh,
+                job.GhiChuXn,
+                job.MaXiNghiep,
+                job.Stt,
+                customer.TenKhachHang,
+                customer.DiaChiDongHo,
+                customer.PhoneUt1
+            };
+
+        if (branches is not null)
+            query = query.Where(x => x.MaXiNghiep != null && branches.Contains(x.MaXiNghiep));
+
+        var rows = await query
+            .OrderBy(x => x.Stt)
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count == 0)
+            return JsonObject(new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        var response = new List<object>();
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            var tienNo = await GetTongDuNoTheoMaKhV2Async(row.MaKhachHang ?? string.Empty, cancellationToken);
+            if (long.TryParse(tienNo, NumberStyles.Integer, CultureInfo.InvariantCulture, out var tienNoNumber))
+                tienNo = tienNoNumber.ToString("#,##0", CultureInfo.InvariantCulture);
+
+            response.Add(new
+            {
+                ROOT = "00- OK",
+                ID_XAC_NHAN = row.IdXacNhan,
+                STT = i + 1,
+                MA_KHACH_HANG = row.MaKhachHang,
+                NGAY_DOC = row.NgayDoc,
+                SO_DOC = row.MaSoDoc,
+                NGAY_XN_BAN_GIAO = row.NgayXnBgNhanVien,
+                TINH_TRANG_HO_SO = row.NgayHoanThanh.HasValue ? "Đã thực hiện" : "Chưa thực hiện",
+                TIEN_NO = tienNo,
+                GHI_CHU_XN = row.GhiChuXn,
+                TEN_KHACH_HANG = row.TenKhachHang,
+                DIA_CHI_DONG_HO = row.DiaChiDongHo,
+                SO_DIEN_THOAI = row.PhoneUt1
+            });
+        }
+
+        return JsonObject(response);
     }
 
     public async Task<ContentResult> A_012_CHECKIN_DS_KH_MO_NUOC(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await (from job in _context.AppCheckInMoNuocs.AsNoTracking()
+        var (fromDate, toDate) = ParseDmyDateRange(TU_NGAY, DEN_NGAY);
+        var branches = LayMaXiNghiepMoi(MA_XI_NGHIEP);
+
+        var query = from job in _context.AppCheckInMoNuocs.AsNoTracking()
             join customer in _context.ThongTinKhs.AsNoTracking() on job.MaKhachHang equals customer.MaKhachHang
-            where job.MaNhanVien == MA_NHAN_VIEN && job.MaXiNghiep == MA_XI_NGHIEP
-            orderby job.IdXacNhan
-            select new { ROOT = "00- OK", job.IdXacNhan, job.MaKhachHang, customer.TenKhachHang, customer.DiaChiDongHo, SO_DIEN_THOAI = customer.PhoneUt1, job.NgayXnBgNhanVien, job.NgayHoanThanh, job.MaSoDoc, job.TenFileAnh, job.GhiChuXn }).ToListAsync(cancellationToken);
-        return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } } : rows.Cast<object>());
+            where job.MaNhanVien == MA_NHAN_VIEN
+                && job.NgayXnBgNhanVien >= fromDate
+                && job.NgayXnBgNhanVien < toDate
+                && customer.NgayThanhLyHd == null
+            select new
+            {
+                job.IdXacNhan,
+                job.MaKhachHang,
+                job.NgayDoc,
+                job.MaSoDoc,
+                job.NgayXnBgNhanVien,
+                job.NgayHoanThanh,
+                job.GhiChuXn,
+                job.MaXiNghiep,
+                customer.TenKhachHang,
+                customer.DiaChiDongHo,
+                customer.PhoneUt1
+            };
+
+        if (branches is not null)
+            query = query.Where(x => x.MaXiNghiep != null && branches.Contains(x.MaXiNghiep));
+
+        var rows = await query
+            .OrderBy(x => x.IdXacNhan)
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count == 0)
+            return JsonObject(new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        var response = rows.Select((row, index) => new
+        {
+            ROOT = "00- OK",
+            ID_XAC_NHAN = row.IdXacNhan,
+            STT = index + 1,
+            MA_KHACH_HANG = row.MaKhachHang,
+            NGAY_DOC = row.NgayDoc,
+            SO_DOC = row.MaSoDoc,
+            NGAY_XN_BAN_GIAO = row.NgayXnBgNhanVien,
+            TINH_TRANG_HO_SO = row.NgayHoanThanh.HasValue ? "Đã thực hiện" : "Chưa thực hiện",
+            GHI_CHU_XN = row.GhiChuXn,
+            TIEN_NO = 0,
+            TEN_KHACH_HANG = row.TenKhachHang,
+            DIA_CHI_DONG_HO = row.DiaChiDongHo,
+            SO_DIEN_THOAI = row.PhoneUt1
+        });
+
+        return JsonObject(response);
     }
 
     public async Task<ContentResult> A_013_CHECKIN_DS_KH_GUI_GB(string? MA_NHAN_VIEN, string? TU_NGAY, string? DEN_NGAY, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
-        var rows = await (from job in _context.AppCheckInGuiGiays.AsNoTracking()
+        var (fromDate, toDate) = ParseDmyDateRange(TU_NGAY, DEN_NGAY);
+        var branches = LayMaXiNghiepMoi(MA_XI_NGHIEP);
+
+        var query = from job in _context.AppCheckInGuiGiays.AsNoTracking()
             join customer in _context.ThongTinKhs.AsNoTracking() on job.MaKhachHang equals customer.MaKhachHang
-            where job.MaNhanVien == MA_NHAN_VIEN && job.MaXiNghiep == MA_XI_NGHIEP
-            orderby job.IdXacNhan
-            select new { ROOT = "00- OK", job.IdXacNhan, job.MaKhachHang, customer.TenKhachHang, customer.DiaChiDongHo, SO_DIEN_THOAI = customer.PhoneUt1, job.NgayXnBgNhanVien, job.NgayHoanThanh, job.MaSoDoc, job.TenFileAnh, job.GhiChuXn }).ToListAsync(cancellationToken);
-        return JsonObject(rows.Count == 0 ? new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } } : rows.Cast<object>());
+            where job.MaNhanVien == MA_NHAN_VIEN
+                && job.NgayXnBgNhanVien >= fromDate
+                && job.NgayXnBgNhanVien < toDate
+                && customer.NgayThanhLyHd == null
+            select new
+            {
+                job.IdXacNhan,
+                job.MaKhachHang,
+                job.NgayDoc,
+                job.MaSoDoc,
+                job.NgayXnBgNhanVien,
+                job.NgayHoanThanh,
+                job.GhiChuXn,
+                job.MaXiNghiep,
+                customer.TenKhachHang,
+                customer.DiaChiDongHo,
+                customer.PhoneUt1
+            };
+
+        if (branches is not null)
+            query = query.Where(x => x.MaXiNghiep != null && branches.Contains(x.MaXiNghiep));
+
+        var rows = await query
+            .OrderBy(x => x.IdXacNhan)
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count == 0)
+            return JsonObject(new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        var response = new List<object>();
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            var tienNo = await GetTongTienNoAsync(row.MaKhachHang ?? string.Empty, cancellationToken);
+
+            response.Add(new
+            {
+                ROOT = "00- OK",
+                ID_XAC_NHAN = row.IdXacNhan,
+                STT = i + 1,
+                MA_KHACH_HANG = row.MaKhachHang,
+                NGAY_DOC = row.NgayDoc,
+                SO_DOC = row.MaSoDoc,
+                NGAY_XN_BAN_GIAO = row.NgayXnBgNhanVien,
+                TIEN_NO = tienNo,
+                TINH_TRANG_HO_SO = row.NgayHoanThanh.HasValue ? "Đã thực hiện" : "Chưa thực hiện",
+                GHI_CHU_XN = row.GhiChuXn,
+                TEN_KHACH_HANG = row.TenKhachHang,
+                DIA_CHI_DONG_HO = row.DiaChiDongHo,
+                SO_DIEN_THOAI = row.PhoneUt1
+            });
+        }
+
+        return JsonObject(response);
+    }
+
+    public async Task<ContentResult> A_014_CHECKIN_TT_KH_CAT_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    {
+        var branches = LayMaXiNghiepMoi(MA_XI_NGHIEP);
+        var query = _context.AppCheckInCatNuocs
+            .AsNoTracking()
+            .Where(x => x.MaNhanVien == MA_NHAN_VIEN && x.IdXacNhan == ID_XAC_NHAN);
+
+        if (branches is not null)
+            query = query.Where(x => x.MaXiNghiep != null && branches.Contains(x.MaXiNghiep));
+
+        var rows = await query
+            .OrderBy(x => x.Stt)
+            .Select(x => new
+            {
+                ROOT = "00- OK",
+                NGAY_HOAN_THANH = FormatDmy(x.NgayHoanThanh),
+                x.MaGhiChu,
+                x.GhiChuThem,
+                x.NguoiThiCong,
+                x.KieuCatMo
+            })
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count == 0)
+            return JsonObject(new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        return JsonObject(rows.Select(x => new
+        {
+            x.ROOT,
+            NGAY_HOAN_THANH = x.NGAY_HOAN_THANH,
+            MA_GHI_CHU = x.MaGhiChu,
+            GHI_CHU_THEM = x.GhiChuThem,
+            NGUOI_THI_CONG = x.NguoiThiCong,
+            KIEU_CAT_MO = x.KieuCatMo
+        }));
+    }
+
+    public async Task<ContentResult> A_014_CHECKIN_TT_KH_CAT_NUOC_V2(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    {
+        var branches = LayMaXiNghiepMoi(MA_XI_NGHIEP);
+        var query = _context.AppCheckInCatNuocs
+            .AsNoTracking()
+            .Where(x => x.MaNhanVien == MA_NHAN_VIEN && x.IdXacNhan == ID_XAC_NHAN);
+
+        if (branches is not null)
+            query = query.Where(x => x.MaXiNghiep != null && branches.Contains(x.MaXiNghiep));
+
+        var rows = await query
+            .OrderBy(x => x.Stt)
+            .Select(x => new
+            {
+                ROOT = "00- OK",
+                NGAY_HOAN_THANH = FormatDmy(x.NgayHoanThanh),
+                x.MaGhiChu,
+                x.GhiChuThem,
+                x.NguoiThiCong,
+                x.KieuCatMo,
+                NGAY_NIEM = FormatDmy(x.NgayNiem),
+                x.SoKimNiem,
+                x.ChiSoNiem,
+                x.ChiSoCat
+            })
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count == 0)
+            return JsonObject(new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        return JsonObject(rows.Select(x => new
+        {
+            x.ROOT,
+            NGAY_HOAN_THANH = x.NGAY_HOAN_THANH,
+            MA_GHI_CHU = x.MaGhiChu,
+            GHI_CHU_THEM = x.GhiChuThem,
+            NGUOI_THI_CONG = x.NguoiThiCong,
+            KIEU_CAT_MO = x.KieuCatMo,
+            NGAY_NIEM = x.NGAY_NIEM,
+            SO_KIM_NIEM = x.SoKimNiem,
+            CHI_SO_NIEM = x.ChiSoNiem,
+            CHI_SO_CAT = x.ChiSoCat
+        }));
+    }
+
+    public async Task<ContentResult> A_015_CHECKIN_TT_KH_MO_NUOC(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    {
+        var branches = LayMaXiNghiepMoi(MA_XI_NGHIEP);
+        var query = _context.AppCheckInMoNuocs
+            .AsNoTracking()
+            .Where(x => x.MaNhanVien == MA_NHAN_VIEN && x.IdXacNhan == ID_XAC_NHAN);
+
+        if (branches is not null)
+            query = query.Where(x => x.MaXiNghiep != null && branches.Contains(x.MaXiNghiep));
+
+        var rows = await query
+            .OrderBy(x => x.Stt)
+            .Select(x => new
+            {
+                ROOT = "00- OK",
+                NGAY_HOAN_THANH = FormatDmy(x.NgayHoanThanh),
+                x.MaGhiChu,
+                x.GhiChuThem,
+                x.NguoiThiCong,
+                x.KieuCatMo
+            })
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count == 0)
+            return JsonObject(new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        return JsonObject(rows.Select(x => new
+        {
+            x.ROOT,
+            NGAY_HOAN_THANH = x.NGAY_HOAN_THANH,
+            MA_GHI_CHU = x.MaGhiChu,
+            GHI_CHU_THEM = x.GhiChuThem,
+            NGUOI_THI_CONG = x.NguoiThiCong,
+            KIEU_CAT_MO = x.KieuCatMo
+        }));
+    }
+
+    public async Task<ContentResult> A_015_CHECKIN_TT_KH_MO_NUOC_V2(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    {
+        var branches = LayMaXiNghiepMoi(MA_XI_NGHIEP);
+        var query = _context.AppCheckInMoNuocs
+            .AsNoTracking()
+            .Where(x => x.MaNhanVien == MA_NHAN_VIEN && x.IdXacNhan == ID_XAC_NHAN);
+
+        if (branches is not null)
+            query = query.Where(x => x.MaXiNghiep != null && branches.Contains(x.MaXiNghiep));
+
+        var rows = await query
+            .OrderBy(x => x.Stt)
+            .Select(x => new
+            {
+                ROOT = "00- OK",
+                NGAY_HOAN_THANH = FormatDmy(x.NgayHoanThanh),
+                x.MaGhiChu,
+                x.GhiChuThem,
+                x.NguoiThiCong,
+                x.KieuCatMo,
+                NGAY_NIEM = FormatDmy(x.NgayNiem),
+                x.SoKimNiem,
+                x.ChiSoNiem,
+                x.ChiSoMo
+            })
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count == 0)
+            return JsonObject(new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        return JsonObject(rows.Select(x => new
+        {
+            x.ROOT,
+            NGAY_HOAN_THANH = x.NGAY_HOAN_THANH,
+            MA_GHI_CHU = x.MaGhiChu,
+            GHI_CHU_THEM = x.GhiChuThem,
+            NGUOI_THI_CONG = x.NguoiThiCong,
+            KIEU_CAT_MO = x.KieuCatMo,
+            NGAY_NIEM = x.NGAY_NIEM,
+            SO_KIM_NIEM = x.SoKimNiem,
+            CHI_SO_NIEM = x.ChiSoNiem,
+            CHI_SO_MO = x.ChiSoMo
+        }));
+    }
+
+    public async Task<ContentResult> A_016_CHECKIN_TT_KH_GUI_GB(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    {
+        var branches = LayMaXiNghiepMoi(MA_XI_NGHIEP);
+        var query = _context.AppCheckInGuiGiays
+            .AsNoTracking()
+            .Where(x => x.MaNhanVien == MA_NHAN_VIEN && x.IdXacNhan == ID_XAC_NHAN);
+
+        if (branches is not null)
+            query = query.Where(x => x.MaXiNghiep != null && branches.Contains(x.MaXiNghiep));
+
+        var rows = await query
+            .OrderBy(x => x.Stt)
+            .Select(x => new
+            {
+                ROOT = "00- OK",
+                NGAY_HOAN_THANH = FormatDmy(x.NgayHoanThanh),
+                x.GhiChuThem
+            })
+            .ToListAsync(cancellationToken);
+
+        if (rows.Count == 0)
+            return JsonObject(new object[] { new { ROOT = "16- Dữ liệu không tìm thấy." } });
+
+        return JsonObject(rows.Select(x => new
+        {
+            x.ROOT,
+            NGAY_HOAN_THANH = x.NGAY_HOAN_THANH,
+            GHI_CHU_THEM = x.GhiChuThem
+        }));
+    }
+
+    public async Task<ContentResult> A_016_CHECKIN_TT_KH_GUI_GB_V2(string? ID_XAC_NHAN, string? MA_NHAN_VIEN, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
+    {
+        return await A_016_CHECKIN_TT_KH_GUI_GB(
+            ID_XAC_NHAN,
+            MA_NHAN_VIEN,
+            MA_XI_NGHIEP,
+            SO_IMEI,
+            PASSWORD_K,
+            cancellationToken);
     }
 
     public async Task<ContentResult> A_99_CHECKIN_DM_KIEU_CAT(string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
@@ -3764,29 +4135,32 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
             if (string.IsNullOrWhiteSpace(dk.PhoneNew))
                 throw new BadRequestException("Số điện thoại mới không được để trống");
 
-            var item = await _context.ThongTinKhs
-                .AsTracking()
-                .FirstOrDefaultAsync(x =>
-                    x.NgayThanhLyHd == null &&
-                    x.MaKhachHang == dk.MaKhachHang &&
-                    x.PhoneUt1 == dk.PhoneUt1)
-                ?? throw new BadRequestException("Thông tin không tìm thấy");
+            var customerCode = dk.MaKhachHang.Trim();
+            var phoneOld = dk.PhoneUt1.Trim();
+            var phoneNew = dk.PhoneNew.Trim();
 
-            if (item.PhoneUt1 == dk.PhoneNew)
+            if (phoneOld == phoneNew)
                 return;
 
-            var phoneOld = item.PhoneUt1;
+            var affectedRows = await _context.ThongTinKhs
+                .Where(x =>
+                    x.NgayThanhLyHd == null &&
+                    x.MaKhachHang == customerCode &&
+                    x.PhoneUt1 == phoneOld)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.SoDienThoaiCuLuu, phoneOld)
+                    .SetProperty(x => x.PhoneUt1, phoneNew));
 
-            item.SoDienThoaiCuLuu = phoneOld;
-            item.PhoneUt1 = dk.PhoneNew;
+            if (affectedRows == 0)
+                throw new BadRequestException("Thông tin không tìm thấy");
 
             var logLuuThongTin = new LogThongTinKhSoDienThoai
             {
                 MaBienDoc = dk.MaBienDoc,
-                MaKhachHang = item.MaKhachHang,
+                MaKhachHang = customerCode,
                 NgayThucHien = DateTime.Now,
                 GiaTriCu = phoneOld,
-                GiaTriMoi = dk.PhoneNew
+                GiaTriMoi = phoneNew
             };
 
             _context.LogThongTinKhSoDienThoais.Add(logLuuThongTin);
@@ -3796,3 +4170,10 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
     }
 
 }
+
+
+
+
+
+
+

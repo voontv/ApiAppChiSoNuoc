@@ -24,6 +24,30 @@ public sealed class CheckInController : ControllerBase
     public Task<ContentResult> A_013_CHECKIN_DS_KH_GUI_GB([FromBody] A_013_CHECKIN_DS_KH_GUI_GBRequest request, CancellationToken cancellationToken) =>
         _businesses.A_013_CHECKIN_DS_KH_GUI_GB(request.MA_NHAN_VIEN, request.TU_NGAY, request.DEN_NGAY, request.MA_XI_NGHIEP, request.SO_IMEI, request.PASSWORD_K, cancellationToken);
 
+    [HttpPost("A_014_CHECKIN_TT_KH_CAT_NUOC")]
+    public Task<ContentResult> A_014_CHECKIN_TT_KH_CAT_NUOC([FromBody] A_014_CHECKIN_TT_KH_CAT_NUOCRequest request, CancellationToken cancellationToken) =>
+        _businesses.A_014_CHECKIN_TT_KH_CAT_NUOC(request.ID_XAC_NHAN, request.MA_NHAN_VIEN, request.MA_XI_NGHIEP, request.SO_IMEI, request.PASSWORD_K, cancellationToken);
+
+    [HttpPost("A_014_CHECKIN_TT_KH_CAT_NUOC_V2")]
+    public Task<ContentResult> A_014_CHECKIN_TT_KH_CAT_NUOC_V2([FromBody] A_014_CHECKIN_TT_KH_CAT_NUOC_V2Request request, CancellationToken cancellationToken) =>
+        _businesses.A_014_CHECKIN_TT_KH_CAT_NUOC_V2(request.ID_XAC_NHAN, request.MA_NHAN_VIEN, request.MA_XI_NGHIEP, request.SO_IMEI, request.PASSWORD_K, cancellationToken);
+
+    [HttpPost("A_015_CHECKIN_TT_KH_MO_NUOC")]
+    public Task<ContentResult> A_015_CHECKIN_TT_KH_MO_NUOC([FromBody] A_015_CHECKIN_TT_KH_MO_NUOCRequest request, CancellationToken cancellationToken) =>
+        _businesses.A_015_CHECKIN_TT_KH_MO_NUOC(request.ID_XAC_NHAN, request.MA_NHAN_VIEN, request.MA_XI_NGHIEP, request.SO_IMEI, request.PASSWORD_K, cancellationToken);
+
+    [HttpPost("A_015_CHECKIN_TT_KH_MO_NUOC_V2")]
+    public Task<ContentResult> A_015_CHECKIN_TT_KH_MO_NUOC_V2([FromBody] A_015_CHECKIN_TT_KH_MO_NUOC_V2Request request, CancellationToken cancellationToken) =>
+        _businesses.A_015_CHECKIN_TT_KH_MO_NUOC_V2(request.ID_XAC_NHAN, request.MA_NHAN_VIEN, request.MA_XI_NGHIEP, request.SO_IMEI, request.PASSWORD_K, cancellationToken);
+
+    [HttpPost("A_016_CHECKIN_TT_KH_GUI_GB")]
+    public Task<ContentResult> A_016_CHECKIN_TT_KH_GUI_GB([FromBody] A_016_CHECKIN_TT_KH_GUI_GBRequest request, CancellationToken cancellationToken) =>
+        _businesses.A_016_CHECKIN_TT_KH_GUI_GB(request.ID_XAC_NHAN, request.MA_NHAN_VIEN, request.MA_XI_NGHIEP, request.SO_IMEI, request.PASSWORD_K, cancellationToken);
+
+    [HttpPost("A_016_CHECKIN_TT_KH_GUI_GB_V2")]
+    public Task<ContentResult> A_016_CHECKIN_TT_KH_GUI_GB_V2([FromBody] A_016_CHECKIN_TT_KH_GUI_GB_V2Request request, CancellationToken cancellationToken) =>
+        _businesses.A_016_CHECKIN_TT_KH_GUI_GB_V2(request.ID_XAC_NHAN, request.MA_NHAN_VIEN, request.MA_XI_NGHIEP, request.SO_IMEI, request.PASSWORD_K, cancellationToken);
+
     [HttpPost("A_99_CHECKIN_DM_KIEU_CAT")]
     public Task<ContentResult> A_99_CHECKIN_DM_KIEU_CAT([FromBody] A_99_CHECKIN_DM_KIEU_CATRequest request, CancellationToken cancellationToken) =>
         _businesses.A_99_CHECKIN_DM_KIEU_CAT(request.MA_XI_NGHIEP, request.SO_IMEI, request.PASSWORD_K, cancellationToken);

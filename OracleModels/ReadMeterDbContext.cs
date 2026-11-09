@@ -5134,7 +5134,7 @@ public partial class ReadMeterDbContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("B_020_TEN_DO_UU_TIEN");
             entity.Property(e => e.B020TenNhomCongViec)
-                .HasMaxLength(50)
+                .HasMaxLength(60)
                 .HasColumnName("B_020_TEN_NHOM_CONG_VIEC");
             entity.Property(e => e.B020UsrXnGiaoNt)
                 .HasMaxLength(15)
