@@ -22,7 +22,7 @@ public sealed class DocChiSoController : ControllerBase
 
     [HttpPost("DANGNHAPTHEOMANLD")]
     public Task<ContentResult> DANGNHAPTHEOMANLD([FromBody] DANGNHAPTHEOMANLDRequest request, CancellationToken cancellationToken) =>
-        _businesses.DANGNHAPTHEOMANLD(request.MA_KHACH_HANG, request.PASS, request.SO_DIEN_THOAI, cancellationToken);
+        _businesses.DANGNHAPTHEOMANLD(request.MA_KHACH_HANG, request.PASS, request.SO_DIEN_THOAI, request.ngay_update_version_update, cancellationToken);
 
     [HttpPost("P_011_DANG_NHAP_DOI_MAT_KHAU")]
     public Task<ContentResult> P_011_DANG_NHAP_DOI_MAT_KHAU([FromBody] P_011_DANG_NHAP_DOI_MAT_KHAURequest request, CancellationToken cancellationToken) =>

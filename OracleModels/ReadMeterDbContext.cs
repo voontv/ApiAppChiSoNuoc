@@ -652,8 +652,9 @@ public partial class ReadMeterDbContext : DbContext
         modelBuilder.Entity<AppDhLogBienDoc>(entity =>
         {
             entity
-                .HasNoKey()
                 .ToTable("APP_DH_LOG_BIEN_DOC");
+
+            entity.HasKey(e => e.IdBdLog);
 
             entity.HasIndex(e => e.IdBdLog, "APP_DH_LOG_BIEN_DOC_INDEX1");
 

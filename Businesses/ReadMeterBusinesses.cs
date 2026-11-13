@@ -20,7 +20,7 @@ public interface IReadMeterBusinesses
 {
     Task<ContentResult> P_00_KET_NOI_DB_CHECK(string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> P_01_DANG_NHAP(string? USER, string? PASSWORD, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
-    Task<ContentResult> DANGNHAPTHEOMANLD(string? MA_KHACH_HANG, string? PASS, string? SO_DIEN_THOAI, CancellationToken cancellationToken);
+    Task<ContentResult> DANGNHAPTHEOMANLD(string? MA_KHACH_HANG, string? PASS, string? SO_DIEN_THOAI, string? ngay_update_version_update, CancellationToken cancellationToken);
     Task<ContentResult> P_011_DANG_NHAP_DOI_MAT_KHAU(string? MA_BIEN_DOC, string? PASSWORD_OLD, string? PASSWORD_NEW1, string? PASSWORD_NEW2, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> P_012_LAY_GT_CANH_BAO(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
     Task<ContentResult> P_013_LAY_PHIEN_BAN_APP(string? MA_BIEN_DOC, string? MA_XI_NGHIEP, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken);
@@ -743,18 +743,60 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
     public Task<ContentResult> P_00_KET_NOI_DB_CHECK(string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken) =>
         Task.FromResult(JsonObject(new[] { new { ROOT = "00- OK" } }));
 
+    private async Task log_trace(
+        string? maBD, string? maXN, string? dien_giai, string? ten_ham, string? so_imei,
+        int? thoigianload = 0, CancellationToken cancellationToken = default)
+    {
+        var logDate = DateTime.Now;
+        // Serialize MAX + INSERT across connections using this locking protocol.
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await _context.Database.ExecuteSqlRawAsync(
+            "LOCK TABLE APP_DH_LOG_BIEN_DOC IN EXCLUSIVE MODE", cancellationToken);
+
+        // The legacy IDs are zero-padded strings, so MAX uses string ordering.
+        var lastId = await _context.AppDhLogBienDocs.AsNoTracking()
+            .MaxAsync(x => x.IdBdLog, cancellationToken);
+        long currentId = 0;
+        if (!string.IsNullOrEmpty(lastId) &&
+            (lastId.Length != 9 || lastId.Any(c => c < '0' || c > '9') ||
+             !long.TryParse(lastId, NumberStyles.None, CultureInfo.InvariantCulture, out currentId)))
+            throw new InvalidOperationException("ID_BD_LOG must contain nine decimal digits.");
+        if (currentId >= 999_999_999)
+            throw new InvalidOperationException("ID_BD_LOG has reached its nine-digit limit.");
+        var nextId = currentId + 1;
+
+        var log = new AppDhLogBienDoc
+        {
+            IdBdLog = nextId.ToString("D9", CultureInfo.InvariantCulture),
+            MaBienDoc = maBD,
+            MaXiNghiep = maXN,
+            Imei = so_imei,
+            ThuocHam = ten_ham,
+            DienGiai = dien_giai,
+            ThoiGianLoad = thoigianload,
+            LogDate = logDate
+        };
+
+        _context.AppDhLogBienDocs.Add(log);
+        await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task<ContentResult> P_01_DANG_NHAP(string? USER, string? PASSWORD, string? SO_IMEI, string? PASSWORD_K, CancellationToken cancellationToken)
     {
+        var timer = Stopwatch.StartNew();
         var employee = await _context.DmNhanViens.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Usr == USER, cancellationToken);
         if (employee is null)
             return JsonObject(new[] { new { ROOT = "11- Tên đăng nhập không đúng." } });
         if (employee.Pas != PASSWORD)
             return JsonObject(new[] { new { ROOT = "12- Mật khẩu không đúng." } });
+        await log_trace(employee.MaNhanVien, employee.MaChiNhanh, "00- OK",
+            nameof(P_01_DANG_NHAP), SO_IMEI, (int)timer.Elapsed.TotalSeconds, cancellationToken);
         return JsonObject(new[] { new { ROOT = "00- OK", MA_BIEN_DOC = employee.MaNhanVien, MA_XI_NGHIEP = employee.MaChiNhanh } });
     }
 
-    public async Task<ContentResult> DANGNHAPTHEOMANLD(string? MA_KHACH_HANG, string? PASS, string? SO_DIEN_THOAI, CancellationToken cancellationToken)
+    public async Task<ContentResult> DANGNHAPTHEOMANLD(string? MA_KHACH_HANG, string? PASS, string? SO_DIEN_THOAI, string? ngay_update_version_update, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(15));
@@ -779,6 +821,9 @@ public sealed class ReadMeterBusinesses : ControllerBase, IReadMeterBusinesses
             .FirstOrDefaultAsync(x => x.MaNhanVien == meterReader, cancellationToken);
         if (employee is null)
             return JsonObject(new[] { new { ROOT = "11- Tên đăng nhập không đúng." } });
+
+        await log_trace(employee.MaNhanVien, employee.MaChiNhanh, ngay_update_version_update,
+            "DANG_NHAP_MA_NLD", null, null, cancellationToken);
 
         return JsonObject(new[] { new { ROOT = "00- OK", MA_BIEN_DOC = employee.MaNhanVien, MA_XI_NGHIEP = employee.MaChiNhanh } });
     }

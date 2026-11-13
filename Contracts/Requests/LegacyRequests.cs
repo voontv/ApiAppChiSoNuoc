@@ -191,7 +191,8 @@ public sealed record P_01_DANG_NHAPRequest(
 public sealed record DANGNHAPTHEOMANLDRequest(
     [property: JsonPropertyName("ma_khach_hang")] string? MA_KHACH_HANG,
     [property: JsonPropertyName("pass")] string? PASS,
-    [property: JsonPropertyName("so_dien_thoai")] string? SO_DIEN_THOAI);
+    [property: JsonPropertyName("so_dien_thoai")] string? SO_DIEN_THOAI,
+    [property: JsonPropertyName("ngay_update_version_update")] string? ngay_update_version_update);
 
 public sealed record P_011_DANG_NHAP_DOI_MAT_KHAURequest(
     [property: JsonPropertyName("MA_BIEN_DOC")] string? MA_BIEN_DOC,
